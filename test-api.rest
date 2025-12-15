@@ -1,0 +1,155 @@
+# OpenTelemetry Demo API 測試檔案
+#
+# 使用方式：
+# 1. 啟動自動化儀器版本: npm run start:auto (port 3000)
+# 2. 啟動手動儀器版本: npm run start:manual (port 3001)
+# 3. 在 VS Code 中安裝 "REST Client" 擴充套件
+# 4. 點擊每個請求上方的 "Send Request" 來測試
+
+# ===== 自動化儀器版本測試 (Auto) =====
+
+@autoUrl = http://localhost:3000
+
+### 1. 註冊新用戶 (Auto)
+POST {{autoUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123"
+}
+
+### 2. 再註冊一個用戶 (Auto)
+POST {{autoUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "bob",
+  "password": "password456"
+}
+
+### 3. 登入用戶 (Auto) - 記得複製 sessionId
+POST {{autoUrl}}/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123"
+}
+
+### 4. 列出所有已註冊用戶 (Auto)
+GET {{autoUrl}}/users
+
+### 5. 查詢當前登入用戶 (Auto) - 請將 YOUR_SESSION_ID 替換成上面登入後得到的 sessionId
+GET {{autoUrl}}/user?sessionId=YOUR_SESSION_ID
+
+### 6. 登出 (Auto) - 請將 YOUR_SESSION_ID 替換成上面登入後得到的 sessionId
+POST {{autoUrl}}/logout
+Content-Type: application/json
+
+{
+  "sessionId": "YOUR_SESSION_ID"
+}
+
+### 7. 測試錯誤情況：帳號已存在 (Auto)
+POST {{autoUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123"
+}
+
+### 8. 測試錯誤情況：登入失敗 (Auto)
+POST {{autoUrl}}/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "wrongpassword"
+}
+
+# ===== 手動儀器版本測試 (Manual) =====
+
+@manualUrl = http://localhost:3001
+
+### 1. 註冊新用戶 (Manual)
+POST {{manualUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "charlie",
+  "password": "password789"
+}
+
+### 2. 再註冊一個用戶 (Manual)
+POST {{manualUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "david",
+  "password": "password000"
+}
+
+### 3. 登入用戶 (Manual) - 記得複製 sessionId
+POST {{manualUrl}}/login
+Content-Type: application/json
+
+{
+  "username": "charlie",
+  "password": "password789"
+}
+
+### 4. 列出所有已註冊用戶 (Manual)
+GET {{manualUrl}}/users
+
+### 5. 查詢當前登入用戶 (Manual) - 請將 YOUR_SESSION_ID 替換成上面登入後得到的 sessionId
+GET {{manualUrl}}/user?sessionId=YOUR_SESSION_ID
+
+### 6. 登出 (Manual) - 請將 YOUR_SESSION_ID 替換成上面登入後得到的 sessionId
+POST {{manualUrl}}/logout
+Content-Type: application/json
+
+{
+  "sessionId": "YOUR_SESSION_ID"
+}
+
+### 7. 測試錯誤情況：帳號已存在 (Manual)
+POST {{manualUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "charlie",
+  "password": "password789"
+}
+
+### 8. 測試錯誤情況：登入失敗 (Manual)
+POST {{manualUrl}}/login
+Content-Type: application/json
+
+{
+  "username": "charlie",
+  "password": "wrongpassword"
+}
+
+### ===== 建議的測試流程 =====
+#
+# 1. 同時啟動兩個版本的伺服器（使用不同的終端機視窗）:
+#    終端機 1: npm run start:auto
+#    終端機 2: npm run start:manual
+#
+# 2. 依序執行以下測試，觀察兩個版本收集到的 traces 差異：
+#    a. 註冊用戶（測試 1, 2）
+#    b. 登入用戶（測試 3）- 記得複製回傳的 sessionId
+#    c. 列出所有用戶（測試 4）
+#    d. 查詢當前用戶（測試 5）- 貼上 sessionId
+#    e. 登出（測試 6）- 貼上 sessionId
+#    f. 測試錯誤情況（測試 7, 8）
+#
+# 3. 比較兩個版本在 OpenTelemetry Collector/Backend 中的 traces:
+#    - Auto 版本：會自動收集 HTTP 請求、Express 路由等基本資訊
+#    - Manual 版本：會包含更多自定義的業務邏輯資訊，例如：
+#      * 自定義的 span 名稱（如 "user.register", "user.login"）
+#      * 自定義屬性（如 user.username, user.action）
+#      * 自定義事件（如 "開始驗證註冊資料", "註冊成功"）
+#      * 更詳細的錯誤資訊

@@ -1,11 +1,23 @@
 @url=http://localhost:3000
 
-###
-GET {{url}}/api/login
+
+### 
+# @name login
+POST {{url}}/login
+Content-Type: application/json
+
+{
+    "username": "tony1",
+    "password": "123456"
+}
 
 
 ###
-POST {{url}}/api/login
+@login_session={{login.response.body.sessionId}}
+
+
+### 
+POST {{url}}/register
 Content-Type: application/json
 
 {
@@ -15,18 +27,13 @@ Content-Type: application/json
 
 
 ### 
-POST {{url}}/api/register
+POST {{url}}/logout
 Content-Type: application/json
 
 {
-    "username": "tony1",
-    "password": "123456"
+    "sessionId": "{{login_session}}"
 }
 
 
 ### 
-POST {{url}}/api/logout
-
-
-### 
-GET {{url}}/api/users
+GET {{url}}/users
