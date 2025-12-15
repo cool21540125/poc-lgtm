@@ -1,14 +1,45 @@
-// auto.js - 使用自動化儀器的版本
-// 重要：必須在最開頭引入 tracing.js，這樣 OpenTelemetry 才能自動捕捉所有操作
-require('./tracing.js');
+// auto.js - 使用自動化 Logging 的版本
+// 重要：在開頭引入 logging.js，設定 OpenTelemetry Logs
+const loggerProvider = require('./logging.js');
 
 const express = require('express');
+const { logs } = require('@opentelemetry/api-logs');
+
 const app = express();
 const PORT = 3000;
 
+// 取得 logger 實例（自動化版本：簡單使用，不添加額外屬性）
+const logger = loggerProvider.getLogger('default');
+
+// 建立一個簡單的 logger helper
+// 在自動化版本中，只需要簡單地呼叫 info/warn/error 方法
+const log = {
+  info: (message) => {
+    console.log(`[INFO] ${message}`);
+    logger.emit({
+      severityText: 'INFO',
+      body: message,
+    });
+  },
+  warn: (message) => {
+    console.warn(`[WARN] ${message}`);
+    logger.emit({
+      severityText: 'WARN',
+      body: message,
+    });
+  },
+  error: (message) => {
+    console.error(`[ERROR] ${message}`);
+    logger.emit({
+      severityText: 'ERROR',
+      body: message,
+    });
+  },
+};
+
 // 用於存儲用戶資料的記憶體資料庫
-const users = new Map(); // key: username, value: { username, password }
-const sessions = new Map(); // key: sessionId, value: username
+const users = new Map();
+const sessions = new Map();
 
 // Middleware
 app.use(express.json());
@@ -21,17 +52,19 @@ app.post('/register', (req, res) => {
 
   // 基本驗證
   if (!username || !password) {
+    log.error('註冊失敗：缺少帳號或密碼');
     return res.status(400).json({ error: '請提供帳號和密碼' });
   }
 
   if (users.has(username)) {
+    log.error(`註冊失敗：帳號已存在 - ${username}`);
     return res.status(409).json({ error: '帳號已存在' });
   }
 
-  // 儲存用戶（實際應用應該要加密密碼）
+  // 儲存用戶
   users.set(username, { username, password });
 
-  console.log(`用戶註冊成功: ${username}`);
+  log.info(`用戶註冊成功: ${username}`);
   res.status(201).json({ message: '註冊成功', username });
 });
 
@@ -40,11 +73,13 @@ app.post('/login', (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
+    log.error('登入失敗：缺少帳號或密碼');
     return res.status(400).json({ error: '請提供帳號和密碼' });
   }
 
   const user = users.get(username);
   if (!user || user.password !== password) {
+    log.error(`登入失敗：帳號或密碼錯誤 - ${username}`);
     return res.status(401).json({ error: '帳號或密碼錯誤' });
   }
 
@@ -52,7 +87,7 @@ app.post('/login', (req, res) => {
   const sessionId = generateSessionId();
   sessions.set(sessionId, username);
 
-  console.log(`用戶登入成功: ${username}`);
+  log.info(`用戶登入成功: ${username}`);
   res.status(200).json({
     message: '登入成功',
     sessionId,
@@ -65,16 +100,18 @@ app.post('/logout', (req, res) => {
   const { sessionId } = req.body;
 
   if (!sessionId) {
+    log.error('登出失敗：缺少 sessionId');
     return res.status(400).json({ error: '請提供 sessionId' });
   }
 
   const username = sessions.get(sessionId);
   if (!username) {
+    log.error('登出失敗：Session 不存在或已過期');
     return res.status(404).json({ error: 'Session 不存在或已過期' });
   }
 
   sessions.delete(sessionId);
-  console.log(`用戶登出: ${username}`);
+  log.info(`用戶登出: ${username}`);
   res.status(200).json({ message: '登出成功' });
 });
 
@@ -84,6 +121,7 @@ app.get('/users', (req, res) => {
     username: u.username
   }));
 
+  log.info(`查詢用戶列表，共 ${userList.length} 位用戶`);
   res.status(200).json({
     count: userList.length,
     users: userList
@@ -95,15 +133,18 @@ app.get('/user', (req, res) => {
   const { sessionId } = req.query;
 
   if (!sessionId) {
+    log.error('查詢失敗：缺少 sessionId');
     return res.status(400).json({ error: '請提供 sessionId' });
   }
 
   const username = sessions.get(sessionId);
   if (!username) {
+    log.error('查詢失敗：Session 不存在或已過期');
     return res.status(404).json({ error: 'Session 不存在或已過期' });
   }
 
   const user = users.get(username);
+  log.info(`查詢當前用戶: ${username}`);
   res.status(200).json({
     username: user.username,
     sessionId
@@ -113,16 +154,38 @@ app.get('/user', (req, res) => {
 // ===== Helper Functions =====
 
 function generateSessionId() {
-  return `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
 // ===== 啟動伺服器 =====
 
 app.listen(PORT, () => {
   console.log(`\n========================================`);
-  console.log(`自動化儀器版本 (auto.js) 已啟動`);
+  console.log(`自動化 Logging 版本 (auto.js) 已啟動`);
   console.log(`伺服器運行於: http://localhost:${PORT}`);
   console.log(`========================================\n`);
-  console.log(`提示：所有 HTTP 請求、Express 路由等都會被自動追蹤`);
-  console.log(`無需手動添加任何追蹤代碼\n`);
+  console.log(`提示：使用簡單的 log.info() / log.error() 方法`);
+  console.log(`所有 logs 會自動透過 OTLP 發送到 Alloy → Loki\n`);
+});
+
+// 定期 flush logs (每 5 秒)
+setInterval(async () => {
+  try {
+    await loggerProvider.forceFlush();
+  } catch (error) {
+    console.error('Flush logs 失敗:', error);
+  }
+}, 5000);
+
+// 優雅關閉
+process.on('SIGINT', async () => {
+  console.log('\n正在關閉...');
+  try {
+    await loggerProvider.forceFlush();
+    await loggerProvider.shutdown();
+    console.log('OpenTelemetry LoggerProvider 已關閉');
+  } catch (error) {
+    console.error('關閉失敗:', error);
+  }
+  process.exit(0);
 });

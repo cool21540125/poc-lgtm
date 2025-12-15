@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "@opentelemetry/exporter-logs-otlp-http": "^0.208.0",
+    "@opentelemetry/sdk-logs": "^0.208.0",
     "accepts": "^1.3.8",
     "acorn": "^8.15.0",
     "acorn-import-attributes": "^1.9.5",
@@ -127,7 +129,6 @@
     "yargs": "^17.7.2",
     "yargs-parser": "^21.1.1"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start:auto": "node auto.js",

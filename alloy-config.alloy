@@ -1,0 +1,32 @@
+// Alloy 設定檔 - 接收 OTLP logs 並發送到 Loki
+
+// 1. OTLP Receiver - 接收來自應用程式的 OTLP logs
+otelcol.receiver.otlp "default" {
+	// HTTP receiver
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		logs = [otelcol.processor.batch.default.input]
+	}
+}
+
+// 2. Batch Processor - 批次處理以提升效能
+otelcol.processor.batch "default" {
+	output {
+		logs = [otelcol.exporter.loki.default.input]
+	}
+}
+
+// 3. Loki Exporter - 將 logs 發送到 Loki
+otelcol.exporter.loki "default" {
+	forward_to = [loki.write.local.receiver]
+}
+
+// 4. Loki Write - 寫入到本地 Loki
+loki.write "local" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

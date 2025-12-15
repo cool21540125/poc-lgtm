@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npm init:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(node -pe:*)",
+      "Bash(timeout 5 node:*)",
+      "Bash(timeout 3 node:*)",
+      "Bash(curl:*)"
     ]
   }
 }

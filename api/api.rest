@@ -2,6 +2,16 @@
 
 
 ### 
+POST {{url}}/register
+Content-Type: application/json
+
+{
+    "username": "tony1",
+    "password": "123456"
+}
+
+
+### 
 # @name login
 POST {{url}}/login
 Content-Type: application/json
@@ -11,20 +21,8 @@ Content-Type: application/json
     "password": "123456"
 }
 
-
 ###
 @login_session={{login.response.body.sessionId}}
-
-
-### 
-POST {{url}}/register
-Content-Type: application/json
-
-{
-    "username": "tony1",
-    "password": "123456"
-}
-
 
 ### 
 POST {{url}}/logout
@@ -37,3 +35,6 @@ Content-Type: application/json
 
 ### 
 GET {{url}}/users
+
+
+###

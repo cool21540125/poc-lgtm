@@ -4,7 +4,7 @@
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
-const { Resource } = require('@opentelemetry/resources');
+const { resourceFromAttributes } = require('@opentelemetry/resources');
 const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
 
 // 設定 OTLP Exporter (可以改成你的 collector endpoint)
@@ -14,7 +14,7 @@ const traceExporter = new OTLPTraceExporter({
 
 // 建立 NodeSDK 實例
 const sdk = new NodeSDK({
-  resource: new Resource({
+  resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: 'otel-demo-auto', // 服務名稱
   }),
   traceExporter,

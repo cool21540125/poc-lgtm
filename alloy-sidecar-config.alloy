@@ -1,0 +1,64 @@
+logging {
+	level = "debug" // debug, info, warn, error
+}
+
+// OTLP 接收器 - 接收應用程式的 signals
+otelcol.receiver.otlp "app_signals" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		logs = [otelcol.processor.transform.add_to_resource.input]
+		// traces  = [otelcol.processor.attributes.add_labels.input]
+		// metrics = [otelcol.processor.attributes.add_labels.input]
+	}
+}
+
+// 
+otelcol.processor.transform "add_to_resource" {
+	log_statements {
+		context    = "resource"
+		statements = [
+			`set(attributes["app"], attributes["service.name"])`,
+			`set(attributes["env"], "stag")`,
+		]
+	}
+
+	log_statements {
+		context    = "log"
+		statements = [
+			`set(resource.attributes["method"], attributes["http.request.method"]) where attributes["http.request.method"] != nil`,
+			`set(resource.attributes["path"], attributes["http.target"]) where attributes["http.target"] != nil`,
+		]
+	}
+
+	output {
+		logs = [otelcol.processor.batch.default.input]
+		// traces  = [otelcol.processor.batch.default.input]
+		// metrics = [otelcol.processor.batch.default.input]
+	}
+}
+
+// 批次處理器
+otelcol.processor.batch "default" {
+	timeout = "5s"
+
+	output {
+		logs = [otelcol.exporter.loki.default.input]
+		// traces  = [otelcol.exporter.otlp.traces.input]
+		// metrics = [otelcol.exporter.prometheus.default.input]
+	}
+}
+
+// Loki 輸出器 - 發送日誌到 Loki
+otelcol.exporter.otlphttp "default" {
+	client {
+		endpoint = "http://loki.ob.ec2.istore:3100/otlp"
+		timeout  = "10s"
+	}
+}
