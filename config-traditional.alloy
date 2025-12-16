@@ -1,8 +1,7 @@
+// Jyun 確認這樣可執行
+// 1. OTLP Receiver - 接收來自應用程式的 OTLP logs
 otelcol.receiver.otlp "default" {
-	grpc {
-		endpoint = "0.0.0.0:4317"
-	}
-
+	// HTTP receiver
 	http {
 		endpoint = "0.0.0.0:4318"
 	}
@@ -12,14 +11,21 @@ otelcol.receiver.otlp "default" {
 	}
 }
 
+// 2. Batch Processor - 批次處理以提升效能
 otelcol.processor.batch "default" {
 	output {
-		logs = [otelcol.exporter.otlphttp.default.input]
+		logs = [otelcol.exporter.loki.default.input]
 	}
 }
 
-otelcol.exporter.otlphttp "default" {
-	client {
-		endpoint = "http://loki:3100/otlp"
+// 3. Loki Exporter - 將 logs 發送到 Loki
+otelcol.exporter.loki "default" {
+	forward_to = [loki.write.local.receiver]
+}
+
+// 4. Loki Write - 寫入到本地 Loki
+loki.write "local" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
 	}
 }
