@@ -16,9 +16,9 @@ const loggerProvider = new LoggerProvider({
 logs.setGlobalLoggerProvider(loggerProvider);
 const logger = loggerProvider.getLogger('log001', '0.1.0');
 
+// ===== Otel Log Wrapper =====
 const log = {
   debug: (message, attributes = {}) => {
-    // console.error(`[ERROR] ${message}`, attributes);
     logger.emit({
       severityNumber: SeverityNumber.DEBUG,
       severityText: 'DEBUG',
@@ -30,9 +30,7 @@ const log = {
       },
     });
   },
-
   info: (message, attributes = {}) => {
-    // console.error(`[INFO] ${message}`, attributes);
     logger.emit({
       severityNumber: SeverityNumber.INFO,
       severityText: 'INFO',
@@ -44,9 +42,7 @@ const log = {
       },
     });
   },
-
   error: (message, attributes = {}) => {
-    // console.error(`[ERROR] ${message}`, attributes);
     logger.emit({
       severityNumber: SeverityNumber.ERROR,
       severityText: 'ERROR',
@@ -60,33 +56,23 @@ const log = {
   }
 };
 
-
 // ===== App =====
 const express = require('express');
 const app = express();
-const PORT = 3000; // 改回 3000 以便與 auto.js 對照
+const PORT = 3000;
 const users = new Map();
 const sessions = new Map();
 
 // ===== Middleware =====
 app.use(express.json());
 
-// 📌 自定義 Middleware：為每個請求記錄 log
-app.use((req, res, next) => {
-  // 在 request 物件中保存 request ID，方便後續使用
-  req.requestId = generateRequestId();
-
-  next();
-});
-
+// ===== API =====
 
 // POST /register - 使用者註冊
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
 
-
   if (!username || !password) {
-
     log.error('註冊失敗：缺少必要欄位', {
       'user.username': username || 'undefined',
       'error.type': 'validation_error',
@@ -112,12 +98,10 @@ app.post('/register', (req, res) => {
 
   // 📌 記錄註冊成功，包含業務相關資訊
   log.info('註冊成功', {
-    attributes: {
-      'user.username': username,
-      'user.action': 'register',
-      'users.total_count': users.size,
-      'request.id': req.requestId,
-    }
+    'user.username': username,
+    'user.action': 'register',
+    'users.total_count': users.size,
+    'request.id': req.requestId,
   })
 
   res.status(201).json({ message: '註冊成功', username });
@@ -260,22 +244,15 @@ app.get('/user', (req, res) => {
 });
 
 // ===== Helper Functions =====
-
 function generateSessionId() {
   return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-function generateRequestId() {
-  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-// ===== 啟動伺服器 =====
+// ===== Server =====
 
 app.listen(PORT, () => {
   console.log(`伺服器運行於: http://localhost:${PORT}`);
 });
-
-// ===== 優雅關閉 =====
 
 process.on('SIGTERM', async () => {
   console.log('\n正在關閉...');
