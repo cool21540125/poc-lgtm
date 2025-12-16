@@ -3,7 +3,7 @@
 const loggerProvider = require('./logging.js');
 
 const express = require('express');
-const { logs } = require('@opentelemetry/api-logs');
+const { SeverityNumber } = require('@opentelemetry/api-logs');
 
 const app = express();
 const PORT = 3000;
@@ -17,6 +17,7 @@ const log = {
   info: (message) => {
     console.log(`[INFO] ${message}`);
     logger.emit({
+      severityNumber: SeverityNumber.INFO,
       severityText: 'INFO',
       body: message,
     });
@@ -24,6 +25,7 @@ const log = {
   warn: (message) => {
     console.warn(`[WARN] ${message}`);
     logger.emit({
+      severityNumber: SeverityNumber.WARN,
       severityText: 'WARN',
       body: message,
     });
@@ -31,6 +33,7 @@ const log = {
   error: (message) => {
     console.error(`[ERROR] ${message}`);
     logger.emit({
+      severityNumber: SeverityNumber.ERROR,
       severityText: 'ERROR',
       body: message,
     });
@@ -165,23 +168,14 @@ app.listen(PORT, () => {
   console.log(`伺服器運行於: http://localhost:${PORT}`);
   console.log(`========================================\n`);
   console.log(`提示：使用簡單的 log.info() / log.error() 方法`);
-  console.log(`所有 logs 會自動透過 OTLP 發送到 Alloy → Loki\n`);
+  console.log(`所有 logs 會**立即**透過 OTLP 發送到 Alloy → Loki\n`);
+  console.log(`使用 SimpleLogRecordProcessor，每條 log 都會立即發送\n`);
 });
-
-// 定期 flush logs (每 5 秒)
-setInterval(async () => {
-  try {
-    await loggerProvider.forceFlush();
-  } catch (error) {
-    console.error('Flush logs 失敗:', error);
-  }
-}, 5000);
 
 // 優雅關閉
 process.on('SIGINT', async () => {
   console.log('\n正在關閉...');
   try {
-    await loggerProvider.forceFlush();
     await loggerProvider.shutdown();
     console.log('OpenTelemetry LoggerProvider 已關閉');
   } catch (error) {

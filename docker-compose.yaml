@@ -1,15 +1,14 @@
 version: '3.8'
 
 services:
-  # Loki - Logs 儲存
   loki:
     image: grafana/loki:3.6.2
     container_name: loki
     ports:
-      - "3100:3100"  # Loki HTTP API
+      - "3100:3100"  
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - vol_loki:/loki  # Loki 資料儲存
+      - vol_loki:/loki  
     networks:
       - observability
 
@@ -21,7 +20,8 @@ services:
       - "4318:4318"  # OTLP HTTP receiver
       - "12345:12345"  # Alloy UI
     volumes:
-      - ./alloy-config.alloy:/etc/alloy/config.alloy
+      - ./config.alloy:/etc/alloy/config.alloy
+      # - ./config-traditional.alloy:/etc/alloy/config.alloy
     command:
       - run
       - /etc/alloy/config.alloy

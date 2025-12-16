@@ -1,30 +1,21 @@
-// logging.js - OpenTelemetry Logs SDK 設定檔
-// 這個檔案會在應用程式啟動前被載入，用於設定 OpenTelemetry Logs
-
-const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
+const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk-logs');
 const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
 const { resourceFromAttributes } = require('@opentelemetry/resources');
-const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
+const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
+const { logs, SeverityNumber } = require('@opentelemetry/api-logs');
 
-// 設定 OTLP Logs Exporter (發送到 Alloy)
-const logExporter = new OTLPLogExporter({
-  url: 'http://localhost:4318/v1/logs', // OTLP HTTP endpoint for logs
-});
-
-// 建立 BatchLogRecordProcessor
-const logRecordProcessor = new BatchLogRecordProcessor(logExporter);
-
-// 建立 LoggerProvider
 const loggerProvider = new LoggerProvider({
   resource: resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: 'otel-demo-auto-logs', // 服務名稱
+    [ATTR_SERVICE_NAME]: 'tony_auto',
+    [ATTR_SERVICE_VERSION]: '0.1.0',
   }),
-  logRecordProcessors: [logRecordProcessor],
+  logRecordProcessors: [new SimpleLogRecordProcessor(new OTLPLogExporter({
+    url: 'http://localhost:4318/v1/logs',
+  }))],
 });
+logs.setGlobalLoggerProvider(loggerProvider);
+const logger = loggerProvider.getLogger('log001', '0.1.0');
 
-console.log('OpenTelemetry Logs SDK 已啟動 (自動化版本)');
-
-// 優雅關閉
 process.on('SIGTERM', () => {
   loggerProvider.shutdown()
     .then(() => console.log('OpenTelemetry LoggerProvider 已關閉'))

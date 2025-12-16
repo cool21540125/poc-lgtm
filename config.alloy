@@ -1,0 +1,48 @@
+// otelcol | otlp
+logging {
+	level = "debug"
+}
+
+otelcol.receiver.otlp "default" {
+	grpc {
+		endpoint = "0.0.0.0:4317"
+	}
+
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
+
+	output {
+		logs = [
+			// otelcol.exporter.debug.console.input,
+			otelcol.exporter.otlphttp.default.input,
+		]
+	}
+}
+
+otelcol.processor.batch "default" {
+	output {
+		logs = [
+			// otelcol.exporter.debug.console.input,
+			otelcol.exporter.otlphttp.default.input,
+		]
+	}
+}
+
+// otelcol.exporter.debug "console" {
+// 	verbosity = "detailed"
+// }
+
+otelcol.processor.batch "tko_api" {
+	output {
+		logs = [otelcol.exporter.otlphttp.default.input]
+	}
+}
+
+otelcol.exporter.otlphttp "default" {
+	client {
+		endpoint = "http://loki:3100/otlp"
+	}
+}
+
+// 需要仰賴於 Loki 必須開啟 /otlp/v1/logs

@@ -93,13 +93,13 @@ curl http://localhost:3000/users
 
 ## 📊 API 端點
 
-| 方法 | 路徑 | 說明 | 請求 Body |
-|------|------|------|-----------|
-| POST | `/register` | 使用者註冊 | `{ "username": "xxx", "password": "xxx" }` |
-| POST | `/login` | 用戶登入 | `{ "username": "xxx", "password": "xxx" }` |
-| POST | `/logout` | 用戶登出 | `{ "sessionId": "xxx" }` |
-| GET | `/users` | 列出所有已註冊用戶 | 無 |
-| GET | `/user?sessionId=xxx` | 查詢當前登入用戶 | Query string |
+| 方法 | 路徑                  | 說明               | 請求 Body                                  |
+|------|-----------------------|--------------------|--------------------------------------------|
+| POST | `/register`           | 使用者註冊         | `{ "username": "xxx", "password": "xxx" }` |
+| POST | `/login`              | 用戶登入           | `{ "username": "xxx", "password": "xxx" }` |
+| POST | `/logout`             | 用戶登出           | `{ "sessionId": "xxx" }`                   |
+| GET  | `/users`              | 列出所有已註冊用戶 | 無                                         |
+| GET  | `/user?sessionId=xxx` | 查詢當前登入用戶   | Query string                               |
 
 ## 🔍 兩種實作方式的差異
 
@@ -371,3 +371,19 @@ docker-compose down -v
 - 密碼未加密，不適合用於生產環境
 - Session 管理非常簡單，實際應用需要更完善的實作
 - Loki 使用簡單的本地儲存，生產環境建議使用 S3 或其他物件儲存
+
+
+# 其他
+
+```
+npm install @opentelemetry/api
+npm install @opentelemetry/auto-instrumentations-node
+
+
+export OTEL_TRACES_EXPORTER="otlp"
+export OTEL_TRACES_EXPORTER="otlp"
+export OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4318"
+export OTEL_NODE_RESOURCE_DETECTORS="env,host,os"
+export OTEL_SERVICE_NAME="tonyyyyyyyyyyy"
+NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register" node auto.js
+```

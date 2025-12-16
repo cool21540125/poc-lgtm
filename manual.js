@@ -1,51 +1,38 @@
-// manual.js - 使用手動 Logging 的版本
-// 在這個版本中，我們手動設定 LoggerProvider 並添加詳細的自定義屬性
-
-const express = require('express');
-const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
+const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk-logs');
 const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
 const { resourceFromAttributes } = require('@opentelemetry/resources');
-const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
-const { SeverityNumber } = require('@opentelemetry/api-logs');
+const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
+const { logs, SeverityNumber } = require('@opentelemetry/api-logs');
 
-const app = express();
-const PORT = 3000; // 改回 3000 以便與 auto.js 對照
-
-// ===== OpenTelemetry Logs 手動設定 =====
-
-// 1. 設定 Resource (服務資訊)
-const resource = resourceFromAttributes({
-  [ATTR_SERVICE_NAME]: 'otel-demo-manual-logs',
-  'environment': 'development',
-  'version': '1.0.0',
-});
-
-// 2. 設定 OTLP Logs Exporter
-const logExporter = new OTLPLogExporter({
-  url: 'http://localhost:4318/v1/logs',
-});
-
-// 3. 建立 BatchLogRecordProcessor
-const logRecordProcessor = new BatchLogRecordProcessor(logExporter);
-
-// 4. 建立 LoggerProvider
 const loggerProvider = new LoggerProvider({
-  resource,
-  logRecordProcessors: [logRecordProcessor],
+  resource: resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: 'tony_manual',
+    [ATTR_SERVICE_VERSION]: '0.1.0',
+  }),
+  logRecordProcessors: [new SimpleLogRecordProcessor(new OTLPLogExporter({
+    url: 'http://localhost:4318/v1/logs',
+  }))],
 });
+logs.setGlobalLoggerProvider(loggerProvider);
+const logger = loggerProvider.getLogger('log001', '0.1.0');
 
-console.log('OpenTelemetry Logs SDK 已啟動 (手動版本)');
-
-// 5. 取得 Logger 實例
-// 📌 重點：透過這個 logger 來手動發送 logs
-const logger = loggerProvider.getLogger('manual-demo-logger', '1.0.0');
-
-// 建立一個手動 logger helper
-// 📌 在手動版本中，可以添加豐富的自定義屬性和結構化資訊
 const log = {
-  // 📌 INFO level log
+  debug: (message, attributes = {}) => {
+    // console.error(`[ERROR] ${message}`, attributes);
+    logger.emit({
+      severityNumber: SeverityNumber.DEBUG,
+      severityText: 'DEBUG',
+      body: message,
+      attributes: {
+        ...attributes,
+        'log.level': 'debug',
+        'timestamp': new Date().toISOString(),
+      },
+    });
+  },
+
   info: (message, attributes = {}) => {
-    console.log(`[INFO] ${message}`, attributes);
+    // console.error(`[INFO] ${message}`, attributes);
     logger.emit({
       severityNumber: SeverityNumber.INFO,
       severityText: 'INFO',
@@ -58,24 +45,8 @@ const log = {
     });
   },
 
-  // 📌 WARN level log
-  warn: (message, attributes = {}) => {
-    console.warn(`[WARN] ${message}`, attributes);
-    logger.emit({
-      severityNumber: SeverityNumber.WARN,
-      severityText: 'WARN',
-      body: message,
-      attributes: {
-        ...attributes,
-        'log.level': 'warn',
-        'timestamp': new Date().toISOString(),
-      },
-    });
-  },
-
-  // 📌 ERROR level log
   error: (message, attributes = {}) => {
-    console.error(`[ERROR] ${message}`, attributes);
+    // console.error(`[ERROR] ${message}`, attributes);
     logger.emit({
       severityNumber: SeverityNumber.ERROR,
       severityText: 'ERROR',
@@ -86,65 +57,36 @@ const log = {
         'timestamp': new Date().toISOString(),
       },
     });
-  },
-
-  // 📌 DEBUG level log (示範更細緻的 log level)
-  debug: (message, attributes = {}) => {
-    console.debug(`[DEBUG] ${message}`, attributes);
-    logger.emit({
-      severityNumber: SeverityNumber.DEBUG,
-      severityText: 'DEBUG',
-      body: message,
-      attributes: {
-        ...attributes,
-        'log.level': 'debug',
-        'timestamp': new Date().toISOString(),
-      },
-    });
-  },
+  }
 };
 
-// ===== 資料存儲 =====
 
+// ===== App =====
+const express = require('express');
+const app = express();
+const PORT = 3000; // 改回 3000 以便與 auto.js 對照
 const users = new Map();
 const sessions = new Map();
 
 // ===== Middleware =====
-
 app.use(express.json());
 
 // 📌 自定義 Middleware：為每個請求記錄 log
 app.use((req, res, next) => {
-  // 記錄 HTTP 請求資訊
-  log.info(`收到 HTTP 請求`, {
-    'http.method': req.method,
-    'http.url': req.url,
-    'http.target': req.path,
-    'http.user_agent': req.get('user-agent') || 'unknown',
-    'request.id': generateRequestId(),
-  });
-
   // 在 request 物件中保存 request ID，方便後續使用
   req.requestId = generateRequestId();
 
   next();
 });
 
-// ===== API Endpoints =====
 
 // POST /register - 使用者註冊
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
 
-  // 📌 記錄開始處理註冊請求
-  log.debug('開始處理註冊請求', {
-    'user.username': username,
-    'request.id': req.requestId,
-  });
 
-  // 基本驗證
   if (!username || !password) {
-    // 📌 記錄驗證失敗，包含詳細的錯誤原因
+
     log.error('註冊失敗：缺少必要欄位', {
       'user.username': username || 'undefined',
       'error.type': 'validation_error',
@@ -169,12 +111,14 @@ app.post('/register', (req, res) => {
   users.set(username, { username, password });
 
   // 📌 記錄註冊成功，包含業務相關資訊
-  log.info('用戶註冊成功', {
-    'user.username': username,
-    'user.action': 'register',
-    'users.total_count': users.size,
-    'request.id': req.requestId,
-  });
+  log.info('註冊成功', {
+    attributes: {
+      'user.username': username,
+      'user.action': 'register',
+      'users.total_count': users.size,
+      'request.id': req.requestId,
+    }
+  })
 
   res.status(201).json({ message: '註冊成功', username });
 });
@@ -183,7 +127,7 @@ app.post('/register', (req, res) => {
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
 
-  log.debug('開始處理登入請求', {
+  log.info('開始處理登入請求', {
     'user.username': username,
     'request.id': req.requestId,
   });
@@ -213,13 +157,7 @@ app.post('/login', (req, res) => {
   sessions.set(sessionId, username);
 
   // 📌 記錄登入成功，包含 session 資訊
-  log.info('用戶登入成功', {
-    'user.username': username,
-    'user.action': 'login',
-    'session.id': sessionId,
-    'sessions.active_count': sessions.size,
-    'request.id': req.requestId,
-  });
+  log.info(`${username} - 用戶登入成功`);
 
   res.status(200).json({
     message: '登入成功',
@@ -334,33 +272,14 @@ function generateRequestId() {
 // ===== 啟動伺服器 =====
 
 app.listen(PORT, () => {
-  console.log(`\n========================================`);
-  console.log(`手動 Logging 版本 (manual.js) 已啟動`);
   console.log(`伺服器運行於: http://localhost:${PORT}`);
-  console.log(`========================================\n`);
-  console.log(`📌 重點說明：`);
-  console.log(`1. 使用 logger.emit() 發送 logs`);
-  console.log(`2. 添加自定義屬性 (attributes) 來豐富 log 資訊`);
-  console.log(`3. 使用不同的 severity levels (INFO, WARN, ERROR, DEBUG)`);
-  console.log(`4. 記錄詳細的業務邏輯和錯誤資訊`);
-  console.log(`5. 所有 logs 透過 OTLP 發送到 Alloy → Loki\n`);
 });
-
-// 定期 flush logs (每 5 秒)
-setInterval(async () => {
-  try {
-    await loggerProvider.forceFlush();
-  } catch (error) {
-    console.error('Flush logs 失敗:', error);
-  }
-}, 5000);
 
 // ===== 優雅關閉 =====
 
 process.on('SIGTERM', async () => {
   console.log('\n正在關閉...');
   try {
-    await loggerProvider.forceFlush();
     await loggerProvider.shutdown();
     console.log('OpenTelemetry LoggerProvider 已關閉');
   } catch (error) {
@@ -372,7 +291,6 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('\n正在關閉...');
   try {
-    await loggerProvider.forceFlush();
     await loggerProvider.shutdown();
     console.log('OpenTelemetry LoggerProvider 已關閉');
   } catch (error) {
@@ -380,69 +298,3 @@ process.on('SIGINT', async () => {
   }
   process.exit(0);
 });
-
-// ===== 📌 如何自定義要收集的 logs =====
-//
-// 在手動版本中，你有完全的控制權，可以決定要記錄什麼資訊：
-//
-// 1. **基本 Log 結構**
-//    logger.emit({
-//      severityNumber: SeverityNumber.INFO,  // 數字形式的嚴重程度
-//      severityText: 'INFO',                 // 文字形式的嚴重程度
-//      body: 'Log 訊息內容',                  // Log 的主要內容
-//      attributes: { ... },                  // 自定義屬性
-//    });
-//
-// 2. **添加自定義屬性 (Attributes)**
-//    - 用於記錄結構化的資料，可以用來過濾和搜尋
-//    attributes: {
-//      'user.username': 'alice',
-//      'user.action': 'login',
-//      'error.type': 'validation_error',
-//      'http.method': 'POST',
-//      'request.id': 'req_123',
-//      // 可以添加任何自定義的 key-value
-//    }
-//
-// 3. **使用不同的 Severity Levels**
-//    - DEBUG: 詳細的除錯資訊
-//    - INFO: 一般的資訊性訊息
-//    - WARN: 警告訊息
-//    - ERROR: 錯誤訊息
-//    - FATAL: 嚴重錯誤
-//
-// 4. **記錄業務邏輯資訊**
-//    log.info('用戶註冊成功', {
-//      'user.username': username,
-//      'user.action': 'register',
-//      'users.total_count': users.size,
-//    });
-//
-// 5. **記錄錯誤和異常**
-//    log.error('操作失敗', {
-//      'error.type': 'database_error',
-//      'error.message': error.message,
-//      'error.stack': error.stack,
-//      'operation': 'create_user',
-//    });
-//
-// 範例：記錄資料庫操作
-// log.info('開始資料庫查詢', {
-//   'db.system': 'postgresql',
-//   'db.statement': 'SELECT * FROM users WHERE id = $1',
-//   'db.operation': 'select',
-// });
-//
-// try {
-//   const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
-//   log.info('資料庫查詢成功', {
-//     'db.operation': 'select',
-//     'db.rows_affected': result.length,
-//   });
-// } catch (error) {
-//   log.error('資料庫查詢失敗', {
-//     'db.operation': 'select',
-//     'error.type': 'database_error',
-//     'error.message': error.message,
-//   });
-// }
