@@ -1,48 +1,49 @@
-// otelcol | otlp
 logging {
 	level = "debug"
 }
 
-otelcol.receiver.otlp "default" {
-	grpc {
-		endpoint = "0.0.0.0:4317"
-	}
+otelcol.exporter.debug "debug" {
+	verbosity           = "detailed"
+	use_internal_logger = true
+}
 
+otelcol.receiver.otlp "default" {
 	http {
 		endpoint = "0.0.0.0:4318"
 	}
 
 	output {
+		logs = [otelcol.processor.attributes.additional.input]
+	}
+}
+
+otelcol.processor.attributes "additional" {
+	action {
+		key    = "env"
+		action = "insert"
+		value  = "stag"
+	}
+
+	output {
 		logs = [
-			// otelcol.exporter.debug.console.input,
-			otelcol.exporter.otlphttp.default.input,
+			otelcol.processor.batch.default.input,
+			// otelcol.exporter.debug.debug.input,
 		]
 	}
 }
 
 otelcol.processor.batch "default" {
 	output {
-		logs = [
-			// otelcol.exporter.debug.console.input,
-			otelcol.exporter.otlphttp.default.input,
-		]
+		logs = [otelcol.exporter.loki.default.input]
 	}
 }
 
-// otelcol.exporter.debug "console" {
-// 	verbosity = "detailed"
-// }
-
-otelcol.processor.batch "tko_api" {
-	output {
-		logs = [otelcol.exporter.otlphttp.default.input]
-	}
+otelcol.exporter.loki "default" {
+	forward_to = [loki.write.local.receiver]
 }
 
-otelcol.exporter.otlphttp "default" {
-	client {
-		endpoint = "http://loki:3100/otlp"
+loki.write "local" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
 	}
 }
-
-// 需要仰賴於 Loki 必須開啟 /otlp/v1/logs

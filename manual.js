@@ -68,7 +68,6 @@ app.use(express.json());
 
 // ===== API =====
 
-// POST /register - 使用者註冊
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
 
@@ -83,7 +82,6 @@ app.post('/register', (req, res) => {
   }
 
   if (users.has(username)) {
-    // 📌 記錄帳號重複錯誤
     log.error('註冊失敗：帳號已存在', {
       'user.username': username,
       'error.type': 'conflict',
@@ -93,10 +91,8 @@ app.post('/register', (req, res) => {
     return res.status(409).json({ error: '帳號已存在' });
   }
 
-  // 儲存用戶
   users.set(username, { username, password });
 
-  // 📌 記錄註冊成功，包含業務相關資訊
   log.info('註冊成功', {
     'user.username': username,
     'user.action': 'register',
@@ -107,7 +103,6 @@ app.post('/register', (req, res) => {
   res.status(201).json({ message: '註冊成功', username });
 });
 
-// POST /login - 用戶登入驗證
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
 
@@ -126,7 +121,6 @@ app.post('/login', (req, res) => {
 
   const user = users.get(username);
   if (!user || user.password !== password) {
-    // 📌 記錄登入失敗，區分是帳號不存在還是密碼錯誤
     log.error('登入失敗：帳號或密碼錯誤', {
       'user.username': username,
       'error.type': 'authentication_failed',
@@ -136,11 +130,9 @@ app.post('/login', (req, res) => {
     return res.status(401).json({ error: '帳號或密碼錯誤' });
   }
 
-  // 建立 session
   const sessionId = generateSessionId();
   sessions.set(sessionId, username);
 
-  // 📌 記錄登入成功，包含 session 資訊
   log.info(`${username} - 用戶登入成功`);
 
   res.status(200).json({
@@ -150,7 +142,6 @@ app.post('/login', (req, res) => {
   });
 });
 
-// POST /logout - 用戶登出
 app.post('/logout', (req, res) => {
   const { sessionId } = req.body;
 
@@ -174,7 +165,6 @@ app.post('/logout', (req, res) => {
 
   sessions.delete(sessionId);
 
-  // 📌 記錄登出成功
   log.info('用戶登出成功', {
     'user.username': username,
     'user.action': 'logout',
@@ -186,13 +176,11 @@ app.post('/logout', (req, res) => {
   res.status(200).json({ message: '登出成功' });
 });
 
-// GET /users - 列出已註冊用戶清單
 app.get('/users', (req, res) => {
   const userList = Array.from(users.values()).map(u => ({
     username: u.username
   }));
 
-  // 📌 記錄查詢操作
   log.info('查詢用戶列表', {
     'operation': 'list_users',
     'users.count': userList.length,
@@ -205,7 +193,6 @@ app.get('/users', (req, res) => {
   });
 });
 
-// GET /user - 列出目前已經登入的用戶
 app.get('/user', (req, res) => {
   const { sessionId } = req.query;
 
@@ -229,7 +216,6 @@ app.get('/user', (req, res) => {
 
   const user = users.get(username);
 
-  // 📌 記錄查詢成功
   log.info('查詢當前用戶成功', {
     'operation': 'get_current_user',
     'user.username': username,
@@ -249,11 +235,9 @@ function generateSessionId() {
 }
 
 // ===== Server =====
-
 app.listen(PORT, () => {
   console.log(`伺服器運行於: http://localhost:${PORT}`);
 });
-
 process.on('SIGTERM', async () => {
   console.log('\n正在關閉...');
   try {
@@ -264,7 +248,6 @@ process.on('SIGTERM', async () => {
   }
   process.exit(0);
 });
-
 process.on('SIGINT', async () => {
   console.log('\n正在關閉...');
   try {
