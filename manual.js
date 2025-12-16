@@ -9,7 +9,7 @@ const loggerProvider = new LoggerProvider({
     [ATTR_SERVICE_NAME]: 'tony_manual',
     [ATTR_SERVICE_VERSION]: '0.1.0',
   }),
-  logRecordProcessors: [new SimpleLogRecordProcessor(new OTLPLogExporter({
+  processors: [new SimpleLogRecordProcessor(new OTLPLogExporter({
     url: 'http://localhost:4318/v1/logs',
   }))],
 });
