@@ -24,9 +24,6 @@ const tracerProvider = new NodeTracerProvider({
     url: 'http://localhost:4318/v1/traces',
   }))]
 });
-// tracerProvider.addSpanProcessor(new BatchSpanProcessor(new OTLPTraceExporter({
-//   url: 'http://localhost:4318/v1/traces',
-// })));
 tracerProvider.register();
 const tracer = trace.getTracer('tony_manual', '0.1.0');
 
@@ -80,29 +77,21 @@ const log = {
   }
 };
 
-// ===== Database Models =====
-const { User, Session, testConnection, syncDatabase } = require('./models');
-
-// ===== App =====
+// ===== App Dependencies =====
 const express = require('express');
+const corsMiddleware = require('./middleware/cors');
+const userService = require('./services/userService');
+const { generateSessionId } = require('./utils/helpers');
+const { startServer, gracefulShutdown } = require('./utils/server');
+
 const app = express();
 const PORT = 3000;
 
 // ===== Middleware =====
 app.use(express.json());
+app.use(corsMiddleware);
 
-// CORS middleware for frontend access
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-// ===== API =====
+// ===== API Endpoints with Manual Instrumentation =====
 
 app.post('/register', async (req, res) => {
   // 手動創建 Span：註冊操作
@@ -138,19 +127,29 @@ app.post('/register', async (req, res) => {
   }
 
   try {
-    // 檢查用戶是否已存在
-    const existingUser = await User.findOne({ where: { username } });
-    const totalUsers = await User.count();
+    const { user, totalUsers } = await userService.registerUser(username, password);
 
-    if (existingUser) {
+    span.setAttribute('user.action', 'register');
+    span.setAttribute('users.total_count', totalUsers);
+    span.setStatus({ code: SpanStatusCode.OK });
+
+    log.info('註冊成功', {
+      'user.username': username,
+      'user.action': 'register',
+      'users.total_count': totalUsers,
+      'request.id': req.requestId,
+    })
+
+    span.end();
+    res.status(201).json({ message: '註冊成功', username: user.username });
+  } catch (error) {
+    if (error.message === 'USER_EXISTS') {
       span.setAttribute('error.type', 'conflict');
-      span.setAttribute('users.count', totalUsers);
       span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號已存在' });
 
       log.error('註冊失敗：帳號已存在', {
         'user.username': username,
         'error.type': 'conflict',
-        'users.count': totalUsers,
         'request.id': req.requestId,
       });
 
@@ -158,24 +157,6 @@ app.post('/register', async (req, res) => {
       return res.status(409).json({ error: '帳號已存在' });
     }
 
-    // 創建新用戶
-    const newUser = await User.create({ username, password });
-    const newTotalUsers = await User.count();
-
-    span.setAttribute('user.action', 'register');
-    span.setAttribute('users.total_count', newTotalUsers);
-    span.setStatus({ code: SpanStatusCode.OK });
-
-    log.info('註冊成功', {
-      'user.username': username,
-      'user.action': 'register',
-      'users.total_count': newTotalUsers,
-      'request.id': req.requestId,
-    })
-
-    span.end();
-    res.status(201).json({ message: '註冊成功', username: newUser.username });
-  } catch (error) {
     span.setAttribute('error.type', 'database_error');
     span.setAttribute('error.message', error.message);
     span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
@@ -227,33 +208,8 @@ app.post('/login', async (req, res) => {
   }
 
   try {
-    // 查找用戶
-    const user = await User.findOne({ where: { username } });
-    if (!user || user.password !== password) {
-      span.setAttribute('error.type', 'authentication_failed');
-      span.setAttribute('error.reason', !user ? 'user_not_found' : 'invalid_password');
-      span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號或密碼錯誤' });
-
-      log.error('登入失敗：帳號或密碼錯誤', {
-        'user.username': username,
-        'error.type': 'authentication_failed',
-        'error.reason': !user ? 'user_not_found' : 'invalid_password',
-        'request.id': req.requestId,
-      });
-
-      span.end();
-      return res.status(401).json({ error: '帳號或密碼錯誤' });
-    }
-
-    // 建立 session
     const sessionId = generateSessionId();
-    await Session.create({
-      sessionId,
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 小時後過期
-    });
-
-    const activeSessions = await Session.count();
+    const { user, activeSessions } = await userService.loginUser(username, password, sessionId);
 
     span.setAttribute('user.action', 'login');
     span.setAttribute('session.id', sessionId);
@@ -269,6 +225,22 @@ app.post('/login', async (req, res) => {
       username: user.username
     });
   } catch (error) {
+    if (error.message === 'USER_NOT_FOUND' || error.message === 'INVALID_PASSWORD') {
+      span.setAttribute('error.type', 'authentication_failed');
+      span.setAttribute('error.reason', error.message === 'USER_NOT_FOUND' ? 'user_not_found' : 'invalid_password');
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號或密碼錯誤' });
+
+      log.error('登入失敗：帳號或密碼錯誤', {
+        'user.username': username,
+        'error.type': 'authentication_failed',
+        'error.reason': error.message === 'USER_NOT_FOUND' ? 'user_not_found' : 'invalid_password',
+        'request.id': req.requestId,
+      });
+
+      span.end();
+      return res.status(401).json({ error: '帳號或密碼錯誤' });
+    }
+
     span.setAttribute('error.type', 'database_error');
     span.setAttribute('error.message', error.message);
     span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
@@ -315,34 +287,9 @@ app.post('/logout', async (req, res) => {
   }
 
   try {
-    // 查找 session
-    const session = await Session.findOne({
-      where: { sessionId },
-      include: [{ model: User, as: 'user' }]
-    });
+    const { username, remainingSessions } = await userService.logoutUser(sessionId);
 
-    if (!session) {
-      span.setAttribute('error.type', 'session_not_found');
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Session 不存在或已過期' });
-
-      log.error('登出失敗：Session 不存在或已過期', {
-        'session.id': sessionId,
-        'error.type': 'session_not_found',
-        'request.id': req.requestId,
-      });
-
-      span.end();
-      return res.status(404).json({ error: 'Session 不存在或已過期' });
-    }
-
-    const username = session.user.username;
     span.setAttribute('user.username', username);
-
-    // 刪除 session
-    await Session.destroy({ where: { sessionId } });
-
-    const remainingSessions = await Session.count();
-
     span.setAttribute('user.action', 'logout');
     span.setAttribute('sessions.remaining_count', remainingSessions);
     span.setStatus({ code: SpanStatusCode.OK });
@@ -358,6 +305,20 @@ app.post('/logout', async (req, res) => {
     span.end();
     res.status(200).json({ message: '登出成功' });
   } catch (error) {
+    if (error.message === 'SESSION_NOT_FOUND') {
+      span.setAttribute('error.type', 'session_not_found');
+      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Session 不存在或已過期' });
+
+      log.error('登出失敗：Session 不存在或已過期', {
+        'session.id': sessionId,
+        'error.type': 'session_not_found',
+        'request.id': req.requestId,
+      });
+
+      span.end();
+      return res.status(404).json({ error: 'Session 不存在或已過期' });
+    }
+
     span.setAttribute('error.type', 'database_error');
     span.setAttribute('error.message', error.message);
     span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
@@ -376,14 +337,7 @@ app.post('/logout', async (req, res) => {
 
 app.get('/users', async (req, res) => {
   try {
-    const users = await User.findAll({
-      attributes: ['username', 'createdAt'],
-      order: [['createdAt', 'DESC']]
-    });
-
-    const userList = users.map(u => ({
-      username: u.username
-    }));
+    const userList = await userService.getAllUsers();
 
     log.info('查詢用戶列表', {
       'operation': 'list_users',
@@ -418,22 +372,7 @@ app.get('/user', async (req, res) => {
   }
 
   try {
-    // 查找 session 並關聯 user
-    const session = await Session.findOne({
-      where: { sessionId },
-      include: [{ model: User, as: 'user' }]
-    });
-
-    if (!session) {
-      log.error('查詢失敗：Session 不存在或已過期', {
-        'session.id': sessionId,
-        'error.type': 'session_not_found',
-        'request.id': req.requestId,
-      });
-      return res.status(404).json({ error: 'Session 不存在或已過期' });
-    }
-
-    const username = session.user.username;
+    const { username, sessionId: sid } = await userService.getUserBySession(sessionId);
 
     log.info('查詢當前用戶成功', {
       'operation': 'get_current_user',
@@ -444,9 +383,18 @@ app.get('/user', async (req, res) => {
 
     res.status(200).json({
       username: username,
-      sessionId
+      sessionId: sid
     });
   } catch (error) {
+    if (error.message === 'SESSION_NOT_FOUND') {
+      log.error('查詢失敗：Session 不存在或已過期', {
+        'session.id': sessionId,
+        'error.type': 'session_not_found',
+        'request.id': req.requestId,
+      });
+      return res.status(404).json({ error: 'Session 不存在或已過期' });
+    }
+
     log.error('查詢用戶失敗：數據庫錯誤', {
       'operation': 'get_current_user',
       'session.id': sessionId,
@@ -458,63 +406,9 @@ app.get('/user', async (req, res) => {
   }
 });
 
-// ===== Helper Functions =====
-function generateSessionId() {
-  return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
 // ===== Server =====
-async function startServer() {
-  try {
-    // 測試數據庫連接
-    console.log('[Database] Testing connection...');
-    const connected = await testConnection();
-    if (!connected) {
-      console.error('[Database] Failed to connect. Please check your database configuration.');
-      process.exit(1);
-    }
+startServer(app, PORT, '手動 Logging/Tracing 版本 (manual.js)');
 
-    // 同步數據庫 models（開發環境使用 alter: true，生產環境建議使用 migration）
-    console.log('[Database] Synchronizing models...');
-    await syncDatabase({ alter: true });
-
-    // 啟動 Express 服務器
-    app.listen(PORT, () => {
-      console.log(`\n========================================`);
-      console.log(`手動 Logging/Tracing 版本 (manual.js) 已啟動`);
-      console.log(`伺服器運行於: http://localhost:${PORT}`);
-      console.log(`數據庫: MySQL (ob_poc)`);
-      console.log(`========================================\n`);
-    });
-  } catch (error) {
-    console.error('[Server] Failed to start:', error);
-    process.exit(1);
-  }
-}
-
-// 啟動伺服器
-startServer();
-process.on('SIGTERM', async () => {
-  console.log('\n正在關閉...');
-  try {
-    await tracerProvider.shutdown();
-    console.log('OpenTelemetry TracerProvider 已關閉');
-    await loggerProvider.shutdown();
-    console.log('OpenTelemetry LoggerProvider 已關閉');
-  } catch (error) {
-    console.error('關閉失敗:', error);
-  }
-  process.exit(0);
-});
-process.on('SIGINT', async () => {
-  console.log('\n正在關閉...');
-  try {
-    await tracerProvider.shutdown();
-    console.log('OpenTelemetry TracerProvider 已關閉');
-    await loggerProvider.shutdown();
-    console.log('OpenTelemetry LoggerProvider 已關閉');
-  } catch (error) {
-    console.error('關閉失敗:', error);
-  }
-  process.exit(0);
-});
+// 優雅關閉
+process.on('SIGTERM', () => gracefulShutdown(tracerProvider, loggerProvider));
+process.on('SIGINT', () => gracefulShutdown(tracerProvider, loggerProvider));
