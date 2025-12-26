@@ -1,44 +1,55 @@
-// tracing.js - OpenTelemetry 自動化儀器設定檔
-// 這個檔案會在應用程式啟動前被載入，用於設定 OpenTelemetry
-
-const { NodeSDK } = require('@opentelemetry/sdk-node');
-const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
+const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-node');
 const { resourceFromAttributes } = require('@opentelemetry/resources');
-const { ATTR_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
+const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
+const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
+const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
 
-// 設定 OTLP Exporter (可以改成你的 collector endpoint)
-const traceExporter = new OTLPTraceExporter({
-  url: 'http://localhost:4318/v1/traces', // 預設 OTLP HTTP endpoint
+// 創建 Resource（服務識別資訊）
+const resource = resourceFromAttributes({
+  [ATTR_SERVICE_NAME]: 'tony_auto',
+  [ATTR_SERVICE_VERSION]: '0.1.0',
 });
 
-// 建立 NodeSDK 實例
-const sdk = new NodeSDK({
-  resource: resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: 'otel-demo-auto', // 服務名稱
-  }),
-  traceExporter,
-  // 自動儀器：會自動捕捉 HTTP、Express 等常見框架的 traces
+// 創建 Trace Provider
+const provider = new NodeTracerProvider({
+  resource: resource,
+});
+
+// 配置 OTLP Exporter（發送到 Alloy）
+const exporter = new OTLPTraceExporter({
+  url: 'http://localhost:4318/v1/traces',
+});
+
+// 使用 Batch Processor（批次處理，提高性能）
+provider.addSpanProcessor(new BatchSpanProcessor(exporter));
+
+// 註冊 Provider
+provider.register();
+
+// 自動化 Instrumentation - 自動追蹤 HTTP 和 Express 請求
+registerInstrumentations({
   instrumentations: [
-    getNodeAutoInstrumentations({
-      '@opentelemetry/instrumentation-fs': {
-        enabled: false, // 關閉檔案系統追蹤以減少雜訊
+    new HttpInstrumentation({
+      requestHook: (span, request) => {
+        // 為 HTTP 請求添加時間戳
+        span.setAttribute('http.request.timestamp', new Date().toISOString());
+      },
+    }),
+    new ExpressInstrumentation({
+      requestHook: (span, info) => {
+        // 為 Express 請求添加路由資訊
+        span.setAttribute('express.route', info.route || 'unknown');
       },
     }),
   ],
 });
 
-// 啟動 SDK
-sdk.start();
+console.log('✓ OpenTelemetry Tracing 已初始化（自動化版本）');
+console.log('  - 服務名稱: tony_auto');
+console.log('  - 自動追蹤 HTTP 和 Express 請求');
+console.log('  - Traces 發送到: http://localhost:4318/v1/traces → Alloy → Tempo\n');
 
-console.log('OpenTelemetry 自動化儀器已啟動');
-
-// 優雅關閉
-process.on('SIGTERM', () => {
-  sdk.shutdown()
-    .then(() => console.log('OpenTelemetry SDK 已關閉'))
-    .catch((error) => console.log('關閉 SDK 時發生錯誤', error))
-    .finally(() => process.exit(0));
-});
-
-module.exports = sdk;
+module.exports = provider;

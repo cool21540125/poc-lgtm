@@ -1,5 +1,6 @@
-// auto.js - 使用自動化 Logging 的版本
-// 重要：在開頭引入 logging.js，設定 OpenTelemetry Logs
+// auto.js - 使用自動化 Logging 和 Tracing 的版本
+// 重要：在開頭引入 tracing.js 和 logging.js，設定 OpenTelemetry
+const tracerProvider = require('./tracing.js');  // 必須先引入 tracing（自動儀器化）
 const loggerProvider = require('./logging.js');
 
 const express = require('express');
@@ -176,6 +177,8 @@ app.listen(PORT, () => {
 process.on('SIGINT', async () => {
   console.log('\n正在關閉...');
   try {
+    await tracerProvider.shutdown();
+    console.log('OpenTelemetry TracerProvider 已關閉');
     await loggerProvider.shutdown();
     console.log('OpenTelemetry LoggerProvider 已關閉');
   } catch (error) {
