@@ -4,198 +4,187 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an OpenTelemetry Logs demonstration project showcasing two different approaches to logging in Node.js applications: **automated logging** and **manual logging**. The project is designed for internal demos and educational purposes.
+這是一個 OpenTelemetry 觀測性 POC 專案，展示如何將 logs 和 traces 整合到 Node.js 應用程式中，並透過 LGTM (Loki, Grafana, Tempo, Alloy) stack 進行視覺化分析。
 
-**Architecture**: Node.js Application → Grafana Alloy (OTLP Receiver) → Loki (Log Storage) → Grafana (Visualization)
+**專案目標**：比較 OpenTelemetry 的自動化與手動 instrumentation 實作方式，並透過實際的 Web UI 展示 distributed tracing 的價值。
 
-The project demonstrates the trade-offs between:
-- **Automated logging** (`auto.js`): Simple wrapper functions for quick logging
-- **Manual logging** (`manual.js`): Full control with rich custom attributes and business logic metadata
+## Project Structure
 
-Both implementations use the same Express.js API (user registration, login, logout, user listing) to allow direct comparison of logging approaches.
+```
+ob-loki-alloy/
+├── backend/              # Backend API 應用程式
+│   ├── auto.js          # 使用自動化 instrumentation
+│   ├── manual.js        # 使用手動 instrumentation
+│   ├── logging.js       # OpenTelemetry Logs SDK 配置
+│   ├── tracing.js       # OpenTelemetry Traces SDK 配置（自動化）
+│   ├── package.json     # Backend dependencies
+│   ├── test-api.rest    # REST Client 測試檔案
+│   ├── TESTING_GUIDE.md # 完整測試指南
+│   └── README.md        # Backend 詳細說明
+├── frontend/            # Frontend Web UI（待實作）
+├── lgtm/               # LGTM 觀測堆疊
+│   ├── docker-compose.yaml
+│   ├── config.alloy    # Alloy OTLP receiver & pipeline
+│   ├── tempo-standalone.yaml
+│   ├── loki-standalone.yaml
+│   └── CLAUDE.md       # LGTM stack 架構說明
+└── api/                # API 測試檔案
+```
 
 ## Common Commands
 
-### Running the Application
+### LGTM Stack Management
 
 ```bash
-# Start the automated logging version
-npm run start:auto
-
-# Start the manual logging version
-npm run start:manual
-```
-
-Both versions run on port 3000. Choose one at a time.
-
-### Docker Services
-
-```bash
-# Start the observability stack (Grafana, Loki, Alloy)
-docker-compose up -d
+# Start the observability stack
+cd lgtm && docker compose up -d
 
 # Check service status
-docker-compose ps
+cd lgtm && docker compose ps
 
-# View Alloy logs
-docker-compose logs alloy
+# View logs
+cd lgtm && docker compose logs -f alloy
+cd lgtm && docker compose logs -f tempo
+cd lgtm && docker compose logs -f loki
+
+# Restart services
+cd lgtm && docker compose restart alloy
 
 # Stop all services
-docker-compose down
-
-# Stop and remove all data (including volumes)
-docker-compose down -v
-
-# Restart Alloy after config changes
-docker-compose restart alloy
+cd lgtm && docker compose down
 ```
 
-### Testing the API
-
-The project includes a `test-api.rest` file for API testing. You can also use curl:
+### Backend Development
 
 ```bash
-# Register a user
-curl -X POST http://localhost:3000/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "password123"}'
+# Install dependencies
+cd backend && npm install
 
-# Login
-curl -X POST http://localhost:3000/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "password123"}'
+# Run auto instrumentation version
+cd backend && npm run start:auto
 
-# List all users
-curl http://localhost:3000/users
+# Run manual instrumentation version
+cd backend && npm run start:manual
+
+# Test APIs
+cd backend
+# Use test-api.rest with REST Client extension
+# or use curl commands in TESTING_GUIDE.md
+```
+
+### Verification Commands
+
+```bash
+# Query traces from Tempo (requires tempo-cli)
+tempo-cli query api search --org-id=single-tenant localhost:3200 '{}' 2024-01-01T00:00:00Z 2026-01-01T00:00:00Z
+
+# Query logs from Loki
+curl -s 'http://localhost:3100/loki/api/v1/query_range?query=%7Bservice_name%3D%22tony_auto%22%7D&limit=10'
 ```
 
 ## Code Architecture
 
-### Application Files
+### Backend API Structure
 
-- **`auto.js`**: Automated logging version that uses a simple logger wrapper (`log.info()`, `log.error()`)
-- **`manual.js`**: Manual logging version with full control over log attributes and business metadata
-- **`logging.js`**: OpenTelemetry Logs SDK configuration used by `auto.js`
+Both `auto.js` and `manual.js` implement the same Express.js API with identical business logic:
 
-Note that `manual.js` contains its own OpenTelemetry setup inline at the top of the file rather than importing from `logging.js`.
-
-### OpenTelemetry Configuration
-
-Both applications use:
-- **LoggerProvider** with resource attributes (`service.name`, `service.version`)
-- **SimpleLogRecordProcessor**: Sends each log immediately (not batched)
-- **OTLPLogExporter**: Exports logs via OTLP HTTP to `http://localhost:4318/v1/logs`
-
-Service names differ:
-- `auto.js`: `tony_auto`
-- `manual.js`: `tony_manual`
-
-### Alloy Configuration
-
-Two Alloy configuration files are available:
-
-- **`config.alloy`** (currently used): Extended configuration with debug options and batch processor
-- **`config-traditional.alloy`**: Simplified pipeline with standard batch processing
-
-Both configurations:
-1. Receive OTLP logs on port 4318 (HTTP) and 4317 (gRPC)
-2. Process logs through a batch processor
-3. Export to Loki at `http://loki:3100/otlp`
-
-Important: Loki must have the OTLP endpoint enabled (`/otlp/v1/logs`) for this setup to work.
-
-The docker-compose.yaml mounts `config.alloy` by default. To switch to the traditional config, change the volume mount.
-
-### Data Flow
-
-```
-Application (auto.js or manual.js)
-    ↓ OTLP/HTTP on port 4318
-Alloy (receives, batches)
-    ↓ OTLP HTTP to Loki
-Loki (stores logs)
-    ↓ LogQL queries
-Grafana (visualizes)
-```
-
-### Logging Patterns
-
-**Automated Version** (`auto.js` + `logging.js`):
-- Simple helper: `log.info(message)`, `log.error(message)`
-- Minimal attributes: just severity, timestamp, and message body
-- Best for: Quick development, standard logging needs
-
-**Manual Version** (`manual.js`):
-- Rich attributes: `log.info(message, attributes)`
-- Custom business logic metadata: `user.username`, `error.type`, `request.id`, `operation`, etc.
-- Multiple severity levels: `log.debug()`, `log.info()`, `log.error()`
-- Best for: Detailed business tracking, complex querying needs
-
-Both versions emit logs using the `logger.emit()` method with `SeverityNumber` and `severityText`.
-
-### Express API Structure
-
-The Express application provides a simple user management API with in-memory storage:
-
-- **POST /register**: User registration
-- **POST /login**: User authentication (returns sessionId)
-- **POST /logout**: User logout
-- **GET /users**: List all registered users
-- **GET /user?sessionId=xxx**: Get current logged-in user
+- **POST /register** - User registration
+- **POST /login** - User authentication (returns sessionId)
+- **POST /logout** - User logout
+- **GET /users** - List all registered users
+- **GET /user?sessionId=xxx** - Get current logged-in user
 
 Data structures:
 - `users` Map: stores username → {username, password}
 - `sessions` Map: stores sessionId → username
 
-Note: This is for demo purposes only. Passwords are not encrypted, and data is lost on restart.
+### OpenTelemetry Implementation
 
-### Service Ports
+**auto.js (Automated Instrumentation):**
+- Uses `HttpInstrumentation` and `ExpressInstrumentation` from `tracing.js`
+- Automatically creates spans for all HTTP requests
+- Simple log helper: `log.info()`, `log.error()`
+- Minimal attributes, fast development
 
-- **Application**: 3000
+**manual.js (Manual Instrumentation):**
+- Manually creates spans using `tracer.startSpan()`
+- Full control over span attributes (e.g., `user.username`, `error.type`, `operation`)
+- Rich log attributes for complex queries
+- Requires careful span lifecycle management
+
+### LGTM Stack Data Flow
+
+```
+Backend (auto.js/manual.js)
+    ↓ OTLP/HTTP (port 4318)
+Alloy (collector & processor)
+    ├─→ Logs → Loki (port 3100)
+    └─→ Traces → Tempo (port 4317 gRPC)
+         ↓
+Grafana (port 3001) - Query & Visualization
+```
+
+## Important Configuration Files
+
+### backend/tracing.js
+OpenTelemetry Traces SDK 配置，包含：
+- NodeTracerProvider with resource attributes
+- BatchSpanProcessor for efficient batching
+- OTLPTraceExporter targeting `http://localhost:4318/v1/traces`
+- HttpInstrumentation & ExpressInstrumentation for auto tracing
+
+**重要修正**：必須在 NodeTracerProvider 建構時傳入 `spanProcessors`，不能使用 `provider.addSpanProcessor()`
+
+### backend/logging.js
+OpenTelemetry Logs SDK 配置，包含：
+- LoggerProvider with resource attributes
+- SimpleLogRecordProcessor (immediate send, no batching)
+- OTLPLogExporter targeting `http://localhost:4318/v1/logs`
+
+### lgtm/config.alloy
+Alloy pipeline 配置，包含：
+- OTLP receiver (HTTP 4318, gRPC 4317)
+- Attribute processor (adds `env=stag`, Loki label hints)
+- Batch processors for logs and traces
+- Exporters: Loki (native API) and Tempo (OTLP gRPC)
+
+## Development Notes
+
+- Both applications use CommonJS modules (`type: "commonjs"` in package.json)
+- Service names differ: `tony_auto` (auto.js) vs `tony_manual` (manual.js)
+- All logs include `traceid` and `spanid` for correlation
+- Grafana requires no authentication (anonymous login enabled)
+- Tempo OTLP receivers listen on `0.0.0.0:4317/4318` (not `127.0.0.1`)
+
+## Service Ports
+
+- **Backend API**: 3000
 - **Grafana**: 3001 (mapped from internal 3000)
-- **Loki**: 3100
+- **Loki HTTP**: 3100
+- **Loki gRPC**: 9095
+- **Tempo HTTP**: 3200
+- **Tempo gRPC**: 9096 (mapped from internal 9095)
+- **Tempo OTLP gRPC**: 4317 (internal only)
+- **Tempo OTLP HTTP**: 4318 (internal only)
 - **Alloy OTLP HTTP**: 4318
 - **Alloy OTLP gRPC**: 4317
 - **Alloy UI**: 12345
 
-## Grafana Usage
+## Next Steps
 
-Access Grafana at http://localhost:3001 (anonymous login enabled, no credentials needed).
+1. Implement Frontend Web UI in `frontend/`
+2. Create UI components to call backend APIs
+3. Demonstrate distributed tracing value through UI interactions
+4. Show how traces help debug request flows across frontend → backend → database
 
-To set up Loki data source:
-1. Go to Connections → Data sources → Add data source
-2. Select "Loki"
-3. Set URL: `http://loki:3100`
-4. Click "Save & test"
+## Troubleshooting
 
-Example LogQL queries:
-```logql
-# View all logs
-{service_name="tony_auto"}
+If traces are not appearing in Tempo:
+- Check Alloy logs: `cd lgtm && docker compose logs -f alloy`
+- Verify Tempo is receiving: `tempo-cli query api search ...`
+- Check OTLP exporter URLs in backend code (should be `localhost:4318`)
 
-# View ERROR level logs
-{service_name="tony_manual"} |= "ERROR"
-
-# Query specific user operations
-{service_name="tony_manual"} | json | user_username="alice"
-
-# Query by error type
-{service_name="tony_manual"} | json | error_type="validation_error"
-```
-
-## Development Notes
-
-- The project uses CommonJS modules (`type: "commonjs"` in package.json)
-- OpenTelemetry SDK packages: `@opentelemetry/api`, `@opentelemetry/sdk-logs`, `@opentelemetry/exporter-logs-otlp-http`
-- Both applications handle graceful shutdown (SIGINT/SIGTERM) to properly close the LoggerProvider
-- Alloy runs with debug logging enabled (`level = "debug"`)
-- Docker volumes: `vol_loki` (Loki data), `vol_grafana` (Grafana settings)
-
-## Important Considerations
-
-This is a demo/educational project:
-- User data stored in memory only
-- No password encryption
-- Simple session management
-- Not suitable for production use
-- Loki uses simple local storage (production should use S3 or similar)
+If logs are not appearing in Loki:
+- Check Loki logs: `cd lgtm && docker compose logs -f loki`
+- Verify labels are correct in Alloy config (`service_name` label)
+- Query Loki directly: `curl http://localhost:3100/loki/api/v1/query_range?query={service_name="tony_auto"}`
