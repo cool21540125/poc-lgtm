@@ -4,7 +4,7 @@ services:
 
   loki:
     image: grafana/loki:3.6.2
-    container_name: loki
+    container_name: ob_loki
     hostname: loki
     restart: always
     ports:
@@ -21,7 +21,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.9.0
-    container_name: tempo
+    container_name: ob_tempo
     hostname: tempo
     restart: always 
     ports:
@@ -41,7 +41,7 @@ services:
 
   alloy:
     image: grafana/alloy:v1.12.1
-    container_name: alloy
+    container_name: ob_alloy
     hostname: alloy
     restart: always
     ports:
@@ -64,7 +64,7 @@ services:
 
   grafana:
     image: grafana/grafana:12.3
-    container_name: grafana
+    container_name: ob_grafana
     hostname: grafana
     restart: always
     ports:
