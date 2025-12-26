@@ -1,0 +1,53 @@
+auth_enabled: false
+stream_over_http_enabled: true
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+        grpc:
+
+
+ingester:
+  max_block_duration: 5m
+
+compactor:
+  disabled: false
+  ring:
+    kvstore:
+      store: memberlist
+      prefix: collectors/
+  compaction:
+    block_retention: 336h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal
+
+query_frontend:
+  search:
+    max_duration: 0s
+
+# ## 
+# # https://grafana.com/docs/tempo/latest/configuration/#metrics-generator
+# metrics_generator:
+#   storage:
+#     path: var/tempo/generator/wal
+#     remote_write:
+#       url:
+#   processor:
+#     service_graphs:
+#       enabled: false
+#     span_metrics:
+#       enabled: false

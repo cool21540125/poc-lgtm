@@ -1,0 +1,86 @@
+logging {
+	level = "debug"
+}
+
+otelcol.exporter.debug "debug" {
+	verbosity           = "detailed"
+	use_internal_logger = true
+}
+
+otelcol.receiver.otlp "default" {
+	http { }
+
+	grpc { }
+
+	output {
+		logs   = [otelcol.processor.attributes.additional.input]
+		traces = [otelcol.processor.batch.batch_traces.input]
+	}
+}
+
+// ===== Logs Pipeline =====
+
+otelcol.processor.attributes "additional" {
+	// 添加 env 屬性
+	action {
+		key    = "env"
+		action = "insert"
+		value  = "stag"
+	}
+
+	// 使用 hint 將 resource attributes 晉升為 Loki labels
+	action {
+		key    = "loki.resource.labels"
+		action = "insert"
+		value  = "service.name"
+	}
+
+	// 使用 hint 將 log attributes 晉升為 Loki labels
+	action {
+		key    = "loki.attribute.labels"
+		action = "insert"
+		value  = "severity, env, log.level"
+	}
+
+	output {
+		logs = [
+			otelcol.processor.batch.batch_logs.input,
+			otelcol.exporter.debug.debug.input,
+		]
+	}
+}
+
+otelcol.processor.batch "batch_logs" {
+	output {
+		logs = [otelcol.exporter.loki.monolithic.input]
+	}
+}
+
+otelcol.exporter.loki "monolithic" {
+	forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}
+
+// ===== Traces Pipeline =====
+
+otelcol.processor.batch "batch_traces" {
+	output {
+		traces = [otelcol.exporter.otlp.monolithic.input]
+	}
+}
+
+otelcol.exporter.otlp "monolithic" {
+	client {
+		endpoint = "tempo:4317"
+
+		tls {
+			insecure             = true
+			insecure_skip_verify = false
+		}
+	}
+}

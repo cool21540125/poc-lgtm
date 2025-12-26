@@ -1,0 +1,86 @@
+name: ob-poc
+
+services:
+
+  loki:
+    image: grafana/loki:3.6.2
+    container_name: loki
+    hostname: loki
+    restart: always
+    ports:
+      - "3100:3100" # Loki HTTP
+      - "9095:9095" # Loki gRPC
+    # volumes:
+    #   - "./loki.yaml:/etc/loki/local-config.yaml"
+    command: 
+      - -config.file=/etc/loki/local-config.yaml
+      - -target=all
+      - -config.expand-env=true
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:2.9.0
+    container_name: tempo
+    hostname: tempo
+    restart: always 
+    ports:
+      - "9096:9095"  # Tempo gRPC
+      - "3200:3200"  # Tempo HTTP
+      # - "14268:14268" # jaeger ingest
+      # - "14317:4317" # Tempo 的 otlp grpc
+      # - "14318:4318" # Tempo 的 otlp http
+    volumes:
+      - ./tempo-standalone.yaml:/etc/tempo/tempo.yaml
+    command:
+      - -config.file=/etc/tempo/tempo.yaml
+      - -target=all
+      - -config.expand-env=true
+    networks:
+      - observability
+
+  alloy:
+    image: grafana/alloy:v1.12.1
+    container_name: alloy
+    hostname: alloy
+    restart: always
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+      - "12345:12345"  # Alloy UI
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=experimental # 啟用 DEBUG 的話必須要有這行
+    networks:
+      - observability
+    depends_on:
+      - loki
+      - tempo
+
+  grafana:
+    image: grafana/grafana:12.3
+    container_name: grafana
+    hostname: grafana
+    restart: always
+    ports:
+      - "3001:3000"  # Grafana UI
+    volumes:
+      - ./grafana_datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    networks:
+      - observability
+    depends_on:
+      - loki
+      - tempo
+
+networks:
+  observability:
+    name: observability
