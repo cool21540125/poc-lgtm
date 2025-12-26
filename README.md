@@ -14,7 +14,7 @@ ob-loki-alloy/
 │   ├── test-api.rest    # API 測試檔案
 │   ├── TESTING_GUIDE.md # 完整測試指南
 │   └── README.md        # Backend 詳細說明
-├── frontend/            # Frontend Web UI (待實作)
+├── frontend/            # Frontend Web UI (React + Vite)
 ├── lgtm/               # LGTM 觀測堆疊配置
 │   ├── docker-compose.yaml
 │   ├── config.alloy    # Alloy pipeline 配置
@@ -91,9 +91,34 @@ Backend App → Alloy (OTLP) → Loki/Tempo → Grafana
 - [lgtm/CLAUDE.md](lgtm/CLAUDE.md) - LGTM stack 架構說明
 - [CLAUDE.md](CLAUDE.md) - 專案開發指南
 
-## 下一步
+## 快速啟動完整系統
 
-- [ ] 實作 Frontend Web UI
-- [ ] 從 UI 呼叫 Backend API
-- [ ] 在 Grafana 中觀察 traces 如何追蹤請求鏈路
-- [ ] 展示 OpenTelemetry 的實際價值
+### 1. 啟動 LGTM Stack
+```bash
+cd lgtm && docker compose up -d
+```
+
+### 2. 啟動 Backend API
+```bash
+cd backend
+npm install  # 首次執行
+npm run start:auto  # 或 start:manual
+```
+
+### 3. 啟動 Frontend UI
+```bash
+cd frontend
+npm install  # 首次執行
+npm run dev
+# 訪問 http://localhost:5173
+```
+
+### 4. 在 Grafana 觀察
+訪問 http://localhost:3001，在 Tempo 和 Loki 中查詢和觀察 traces 與 logs 的關聯。
+
+## 體驗 OpenTelemetry 價值
+
+- ✅ Frontend UI 已實作完成
+- ✅ 從 UI 呼叫 Backend API
+- ✅ 在 Grafana 中觀察 traces 如何追蹤請求鏈路
+- ✅ 展示 OpenTelemetry 的實際價值
