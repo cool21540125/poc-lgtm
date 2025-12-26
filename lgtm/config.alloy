@@ -18,6 +18,49 @@ otelcol.receiver.otlp "default" {
 	}
 }
 
+// ===== Faro Receiver (Frontend Observability) =====
+
+faro.receiver "frontend" {
+	server {
+		listen_address = "0.0.0.0"
+		listen_port    = 12345
+		cors_allowed_origins = ["*"]
+	}
+
+	output {
+		logs   = [otelcol.processor.attributes.faro_logs.input]
+		traces = [otelcol.processor.batch.batch_traces.input]
+	}
+}
+
+// Faro logs processor - add frontend-specific attributes
+otelcol.processor.attributes "faro_logs" {
+	action {
+		key    = "source"
+		action = "insert"
+		value  = "faro"
+	}
+
+	action {
+		key    = "loki.resource.labels"
+		action = "insert"
+		value  = "service.name, source"
+	}
+
+	action {
+		key    = "loki.attribute.labels"
+		action = "insert"
+		value  = "severity, level, kind, type"
+	}
+
+	output {
+		logs = [
+			otelcol.processor.batch.batch_logs.input,
+			otelcol.exporter.debug.debug.input,
+		]
+	}
+}
+
 // ===== Logs Pipeline =====
 
 otelcol.processor.attributes "additional" {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Register from './components/Register';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import { pushEvent, setUser as setFaroUser } from './instrumentation';
 import './App.css';
 
 function App() {
@@ -11,6 +12,13 @@ function App() {
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setCurrentView('dashboard');
+
+    // 發送登入事件到 Faro
+    setFaroUser(userData);
+    pushEvent('user_login', {
+      username: userData.username,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const handleRegisterSuccess = () => {
@@ -18,6 +26,12 @@ function App() {
   };
 
   const handleLogout = () => {
+    // 發送登出事件到 Faro
+    pushEvent('user_logout', {
+      username: user?.username,
+      timestamp: new Date().toISOString(),
+    });
+
     setUser(null);
     setCurrentView('login');
   };

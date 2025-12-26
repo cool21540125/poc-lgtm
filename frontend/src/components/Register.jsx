@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { pushEvent, pushError } from '../instrumentation';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -25,13 +26,33 @@ function Register({ onRegisterSuccess, onSwitchToLogin }) {
       const data = await response.json();
 
       if (response.ok) {
+        // 發送註冊成功事件到 Faro
+        pushEvent('user_register_success', {
+          username: data.username,
+          timestamp: new Date().toISOString(),
+        });
+
         alert(`註冊成功！用戶：${data.username}`);
         onRegisterSuccess();
       } else {
         setError(data.error || '註冊失敗');
+
+        // 發送註冊失敗事件到 Faro
+        pushEvent('user_register_failed', {
+          username,
+          error: data.error,
+          timestamp: new Date().toISOString(),
+        });
       }
     } catch (err) {
       setError('連接失敗，請確認 Backend 是否運行');
+
+      // 發送錯誤到 Faro
+      pushError(err, {
+        component: 'Register',
+        action: 'register',
+        username,
+      });
     } finally {
       setLoading(false);
     }
