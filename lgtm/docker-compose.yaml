@@ -4,12 +4,12 @@ services:
 
   loki:
     image: grafana/loki:3.6.2
-    container_name: ob_loki
+    container_name: loki
     hostname: loki
     restart: always
     ports:
-      - "3100:3100" # Loki HTTP
-      - "9095:9095" # Loki gRPC
+      - "0.0.0.0:3100:3100" # Loki HTTP
+      - "0.0.0.0:9095:9095" # Loki gRPC
     # volumes:
     #   - "./loki.yaml:/etc/loki/local-config.yaml"
     command: 
@@ -21,15 +21,15 @@ services:
 
   tempo:
     image: grafana/tempo:2.9.0
-    container_name: ob_tempo
+    container_name: tempo
     hostname: tempo
     restart: always 
     ports:
-      - "9096:9095"  # Tempo gRPC
-      - "3200:3200"  # Tempo HTTP
-      # - "14268:14268" # jaeger ingest
-      # - "14317:4317" # Tempo 的 otlp grpc
-      # - "14318:4318" # Tempo 的 otlp http
+      - "0.0.0.0:9096:9095"  # Tempo gRPC
+      - "0.0.0.0:3200:3200"  # Tempo HTTP
+      # - "0.0.0.0:14268:14268" # jaeger ingest
+      # - "0.0.0.0:14317:4317" # Tempo 的 otlp grpc
+      # - "0.0.0.0:14318:4318" # Tempo 的 otlp http
     volumes:
       - ./tempo-standalone.yaml:/etc/tempo/tempo.yaml
     command:
@@ -41,13 +41,14 @@ services:
 
   alloy:
     image: grafana/alloy:v1.12.1
-    container_name: ob_alloy
+    container_name: alloy
     hostname: alloy
     restart: always
     ports:
-      - "4317:4317"  # OTLP gRPC receiver
-      - "4318:4318"  # OTLP HTTP receiver
-      - "12345:12345"  # Alloy UI
+      # - "0.0.0.0:4317:4317"  # OTLP gRPC receiver
+      - "0.0.0.0:4318:4318"  # OTLP HTTP receiver
+      - "0.0.0.0:12345:12345"  # Alloy UI
+      - "0.0.0.0:12347:12347"  # Faro receiver
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy
     command:
@@ -64,11 +65,11 @@ services:
 
   grafana:
     image: grafana/grafana:12.3
-    container_name: ob_grafana
+    container_name: grafana
     hostname: grafana
     restart: always
     ports:
-      - "3001:3000"  # Grafana UI
+      - "0.0.0.0:3001:3000"  # Grafana UI
     volumes:
       - ./grafana_datasources:/etc/grafana/provisioning/datasources
     environment:

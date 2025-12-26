@@ -257,6 +257,7 @@ log.error('資料庫查詢失敗', {
 - **Ports**:
   - 4318 (OTLP HTTP receiver)
   - 12345 (Alloy UI)
+  - 12347 (Alloy receiver for Faro)
 - **設定檔**: `alloy-config.alloy`
 - **說明**: 接收 OTLP logs 並轉發到 Loki
 

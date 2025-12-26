@@ -94,6 +94,7 @@ The `config.alloy` file defines two separate pipelines:
 - **Alloy OTLP gRPC**: 4317
 - **Alloy OTLP HTTP**: 4318
 - **Alloy UI**: 12345
+- **Alloy Faro**: 12347
 
 ### Configuration Files
 

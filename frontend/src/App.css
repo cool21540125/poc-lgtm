@@ -234,6 +234,10 @@ header h1 {
   background-color: #f9f9f9;
 }
 
+.users-table tbody {
+  color: black;
+}
+
 .no-data {
   text-align: center;
   color: #999;

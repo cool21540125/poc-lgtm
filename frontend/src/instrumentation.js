@@ -3,7 +3,7 @@ import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
 // 初始化 Grafana Faro
 export const faro = initializeFaro({
-  url: 'http://localhost:12345/collect', // Alloy Faro receiver endpoint
+  url: 'http://localhost:12347/collect', // Alloy Faro receiver endpoint
   app: {
     name: 'web',
     version: '0.1.0',

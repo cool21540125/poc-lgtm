@@ -15,6 +15,7 @@ function Register({ onRegisterSuccess, onSwitchToLogin }) {
     setLoading(true);
 
     try {
+      console.log("registering...")
       const response = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
@@ -22,6 +23,7 @@ function Register({ onRegisterSuccess, onSwitchToLogin }) {
         },
         body: JSON.stringify({ username, password }),
       });
+      console.log("---- register OK ----")
 
       const data = await response.json();
 

@@ -169,6 +169,7 @@ Alloy pipeline 配置，包含：
 - **Alloy OTLP HTTP**: 4318
 - **Alloy OTLP gRPC**: 4317
 - **Alloy UI**: 12345
+- **Alloy Faro**: 12347
 
 ## Next Steps
 
