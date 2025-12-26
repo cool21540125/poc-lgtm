@@ -6,8 +6,8 @@ POST {{url}}/register
 Content-Type: application/json
 
 {
-    "username": "tony1",
-    "password": "123456"
+    "username": "alice",
+    "password": "password123"
 }
 
 
@@ -17,8 +17,8 @@ POST {{url}}/login
 Content-Type: application/json
 
 {
-    "username": "tony1",
-    "password": "123456"
+    "username": "alice",
+    "password": "password123"
 }
 
 ###

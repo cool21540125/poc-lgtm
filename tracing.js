@@ -16,15 +16,10 @@ const resource = resourceFromAttributes({
 // 創建 Trace Provider
 const provider = new NodeTracerProvider({
   resource: resource,
+  spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter({
+    url: 'http://localhost:4318/v1/traces',
+  }))],
 });
-
-// 配置 OTLP Exporter（發送到 Alloy）
-const exporter = new OTLPTraceExporter({
-  url: 'http://localhost:4318/v1/traces',
-});
-
-// 使用 Batch Processor（批次處理，提高性能）
-provider.addSpanProcessor(new BatchSpanProcessor(exporter));
 
 // 註冊 Provider
 provider.register();
