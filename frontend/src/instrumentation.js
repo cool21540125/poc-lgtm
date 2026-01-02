@@ -2,7 +2,6 @@ import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
 import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
 const SERVICE_NAME = 'fe_vue';
-const SERVICE_VERSION = '0.1.3';
 const ENVIRONMENT = import.meta.env.VITE_ENVIRONMENT || 'stag';
 
 // 初始化 Grafana Faro
@@ -10,7 +9,6 @@ export const faro = initializeFaro({
   url: 'http://localhost:12347/collect', // Alloy Faro receiver endpoint
   app: {
     name: SERVICE_NAME,
-    version: SERVICE_VERSION,
     environment: ENVIRONMENT,
   },
 
@@ -50,9 +48,9 @@ export const pushEvent = (name, attributes = {}, domain = 'custom') => {
 };
 
 // 工具函數：推送自定義日誌
-export const pushLog = (message, context = {}, level = 'info') => {
+export const pushLog = (message, level = 'info', context = {}) => {
   faroAPI.pushLog([message], {
-    level,
+    level: level.toUpperCase(),
     context,
   });
 };
