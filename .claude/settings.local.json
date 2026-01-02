@@ -10,6 +10,7 @@
       "Bash(timeout 3 node:*)",
       "Bash(curl:*)",
       "Bash(docker compose:*)",
+      "Bash(jq:*)",
       "WebFetch(domain:grafana.com)"
     ]
   }

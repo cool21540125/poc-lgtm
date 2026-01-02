@@ -1,3 +1,4 @@
-.PHONY: web
-web:
+.PHONY: dev
+
+dev:
 	npm run dev

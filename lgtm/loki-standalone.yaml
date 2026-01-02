@@ -19,4 +19,3 @@ distributor:
     kvstore:
       store: inmemory
   max_recv_msg_size: 20971520
-

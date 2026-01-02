@@ -1,7 +1,4 @@
-.PHONY: auto manual
+.PHONY: dev
 
-auto:
-	npm run dev:auto
-
-manual:
-	npm run dev:manual
+dev:
+	npm run dev

@@ -13,8 +13,9 @@ const { logs, SeverityNumber } = require('@opentelemetry/api-logs');
 
 // Resource 定義（Tracing 和 Logging 共用）
 const resource = resourceFromAttributes({
-  [ATTR_SERVICE_NAME]: 'tony_manual',
+  [ATTR_SERVICE_NAME]: 'be_api',
   [ATTR_SERVICE_VERSION]: '0.1.0',
+  "environment.name": 'stag'
 });
 
 // ===== Tracing Provider =====
@@ -25,7 +26,7 @@ const tracerProvider = new NodeTracerProvider({
   }))]
 });
 tracerProvider.register();
-const tracer = trace.getTracer('tony_manual', '0.1.0');
+const tracer = trace.getTracer('be_api', '0.1.0');
 
 // ===== Logging Provider =====
 const loggerProvider = new LoggerProvider({
@@ -91,7 +92,7 @@ const PORT = 3000;
 app.use(express.json());
 app.use(corsMiddleware);
 
-// ===== API Endpoints with Manual Instrumentation =====
+// ===== API =====
 
 app.post('/register', async (req, res) => {
   // 手動創建 Span：註冊操作

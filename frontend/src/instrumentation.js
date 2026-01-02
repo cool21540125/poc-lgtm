@@ -1,29 +1,30 @@
 import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
 import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
+const SERVICE_NAME = 'fe_web';
+const SERVICE_VERSION = '0.1.2';
+const ENVIRONMENT = import.meta.env.VITE_ENVIRONMENT || 'stag';
+
 // 初始化 Grafana Faro
 export const faro = initializeFaro({
   url: 'http://localhost:12347/collect', // Alloy Faro receiver endpoint
   app: {
-    name: 'web',
-    version: '0.1.0',
-    environment: 'dev',
+    name: SERVICE_NAME,
+    version: SERVICE_VERSION,
+    environment: ENVIRONMENT,
   },
 
   // 啟用各種 instrumentation
   instrumentations: [
-    // 自動收集 Web Vitals、錯誤、控制台日誌等
     ...getWebInstrumentations({
-      captureConsole: true,           // 捕獲 console.log/error/warn
-      captureConsoleDisabledLevels: [], // 不禁用任何級別
+      captureConsole: false,
+      captureConsoleDisabledLevels: ['log', 'debug', 'info'],
     }),
 
-    // 啟用分散式追蹤
     new TracingInstrumentation({
       instrumentationOptions: {
-        // 自動追蹤 fetch 和 XHR 請求
         propagateTraceHeaderCorsUrls: [
-          /http:\/\/localhost:3000.*/, // Backend API
+          /http:\/\/localhost:3000.*/,
         ],
       },
     }),
@@ -32,13 +33,11 @@ export const faro = initializeFaro({
   // 啟用 session tracking
   sessionTracking: {
     enabled: true,
-    persistent: true, // session 跨頁面持久化
+    persistent: true,
   },
 
-  // 自動收集用戶互動事件
+  // 移除測試用的 console.log，避免日誌無限遞迴
   beforeSend: (item) => {
-    // 可以在這裡過濾或修改要發送的數據
-    console.log('[Faro] Sending:', item.type, item);
     return item;
   },
 });

@@ -2,24 +2,18 @@ logging {
 	level = "debug"
 }
 
-otelcol.exporter.debug "debug" {
-	verbosity           = "detailed"
-	use_internal_logger = true
-}
-
-otelcol.receiver.otlp "default" {
-	http { }
-
-	// grpc { }
+otelcol.receiver.otlp "backend" {
+	http {
+		endpoint = "0.0.0.0:4318"
+	}
 
 	output {
-		logs   = [otelcol.processor.attributes.additional.input]
-		traces = [otelcol.processor.batch.batch_traces.input]
+		logs   = [otelcol.processor.attributes.backend_logs.input]
+		traces = [otelcol.processor.batch.traces.input]
 	}
 }
 
-// ===== Faro Receiver (Frontend Observability) =====
-
+// Frontend Faro Receiver (Logs + Traces)
 faro.receiver "frontend" {
 	server {
 		listen_address       = "0.0.0.0"
@@ -28,53 +22,80 @@ faro.receiver "frontend" {
 	}
 
 	output {
-		logs   = [loki.write.local.receiver]
-		traces = [otelcol.processor.batch.batch_traces.input]
+		logs   = [loki.process.frontend_logs.receiver]
+		traces = [otelcol.processor.batch.traces.input]
 	}
 }
 
 // ===== Logs Pipeline =====
 
-otelcol.processor.attributes "additional" {
-	// 添加 env 屬性
-	action {
-		key    = "env"
-		action = "insert"
-		value  = "stag"
-	}
-
-	// 使用 hint 將 resource attributes 晉升為 Loki labels
+// Backend Logs: Add attributes & Loki hints
+otelcol.processor.attributes "backend_logs" {
 	action {
 		key    = "loki.resource.labels"
 		action = "insert"
-		value  = "service.name"
+		value  = "service.name, environment.name"
 	}
 
-	// 使用 hint 將 log attributes 晉升為 Loki labels
 	action {
 		key    = "loki.attribute.labels"
 		action = "insert"
-		value  = "severity, env, log.level"
+		value  = "severity"
+	}
+
+	action {
+		key    = "loki.attribute.labels"
+		action = "insert"
+		value  = "environment.name"
 	}
 
 	output {
-		logs = [
-			otelcol.processor.batch.batch_logs.input,
-			otelcol.exporter.debug.debug.input,
-		]
+		logs = [otelcol.processor.batch.logs.input]
 	}
 }
 
-otelcol.processor.batch "batch_logs" {
+// Frontend Logs: Add labels & basic filtering
+loki.process "frontend_logs" {
+	forward_to = [loki.write.local.receiver]
+
+	// // // Extract fields from Faro payload
+	stage.logfmt {
+		mapping = {
+			app_name               = "app_name",
+			app_version            = "app_version",
+			app_environment        = "app_environment",
+			event_data_http_method = "event_data_http.method",
+		}
+	}
+	// // Map fields to Loki labels
+	stage.labels {
+		values = {
+			service_name    = "app_name",
+			service_version = "app_version",
+			app_environment = "app_environment",
+		}
+	}
+
+	// 從 extracted values map 納入到 structured metadata
+	stage.structured_metadata {
+		values = {
+			http_method = "event_data_http_method",
+		}
+	}
+}
+
+// Backend Logs: Batch & Export
+otelcol.processor.batch "logs" {
 	output {
-		logs = [otelcol.exporter.loki.monolithic.input]
+		logs = [otelcol.exporter.loki.default.input]
 	}
 }
 
-otelcol.exporter.loki "monolithic" {
+otelcol.exporter.loki "default" {
 	forward_to = [loki.write.local.receiver]
 }
 
+// Loki Write Endpoint
 loki.write "local" {
 	endpoint {
 		url = "http://loki:3100/loki/api/v1/push"
@@ -83,13 +104,14 @@ loki.write "local" {
 
 // ===== Traces Pipeline =====
 
-otelcol.processor.batch "batch_traces" {
+// Unified Traces: Batch & Export to Tempo
+otelcol.processor.batch "traces" {
 	output {
-		traces = [otelcol.exporter.otlp.monolithic.input]
+		traces = [otelcol.exporter.otlp.tempo.input]
 	}
 }
 
-otelcol.exporter.otlp "monolithic" {
+otelcol.exporter.otlp "tempo" {
 	client {
 		endpoint = "tempo:4317"
 

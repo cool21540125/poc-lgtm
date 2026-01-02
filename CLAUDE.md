@@ -151,7 +151,7 @@ Alloy pipeline 配置，包含：
 ## Development Notes
 
 - Both applications use CommonJS modules (`type: "commonjs"` in package.json)
-- Service names differ: `tony_auto` (auto.js) vs `tony_manual` (manual.js)
+- Service names differ: `tony_auto` (auto.js) vs `be_api` (manual.js)
 - All logs include `traceid` and `spanid` for correlation
 - Grafana requires no authentication (anonymous login enabled)
 - Tempo OTLP receivers listen on `0.0.0.0:4317/4318` (not `127.0.0.1`)

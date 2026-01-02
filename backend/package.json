@@ -139,10 +139,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start:auto": "node auto.js",
-    "start:manual": "node manual.js",
-    "dev:auto": "node auto.js",
-    "dev:manual": "node manual.js"
+    "start": "node manual.js",
+    "dev": "node manual.js"
   },
   "keywords": [],
   "author": "",

@@ -11,7 +11,7 @@
 - **特點**: 使用 HttpInstrumentation 和 ExpressInstrumentation 自動追蹤所有 HTTP 請求
 
 ### Manual.js (手動版本)
-- **Service Name**: `tony_manual`
+- **Service Name**: `be_api`
 - **Logs**: ✅ 成功發送到 Loki (包含自定義屬性)
 - **Traces**: ✅ 成功發送到 Tempo (手動創建 spans)
 - **特點**: 完全控制 span 屬性和業務邏輯元數據
@@ -70,17 +70,17 @@ curl http://localhost:3000/users
 
 **查看 manual.js 的所有 logs:**
 ```logql
-{service_name="tony_manual"}
+{service_name="be_api"}
 ```
 
 **查看錯誤級別的 logs:**
 ```logql
-{service_name="tony_manual"} | json | severity="ERROR"
+{service_name="be_api"} | json | severity="ERROR"
 ```
 
 **查看特定用戶的操作 (manual.js 獨有):**
 ```logql
-{service_name="tony_manual"} | json | user_username="alice"
+{service_name="be_api"} | json | user_username="alice"
 ```
 
 ### 查看 Traces (Tempo)
@@ -96,17 +96,17 @@ curl http://localhost:3000/users
 
 **查看 manual.js 的所有 traces:**
 ```traceql
-{resource.service.name="tony_manual"}
+{resource.service.name="be_api"}
 ```
 
 **查看特定操作的 traces (manual.js):**
 ```traceql
-{resource.service.name="tony_manual" && name="user.register"}
+{resource.service.name="be_api" && name="user.register"}
 ```
 
 **查看有錯誤的 traces (manual.js):**
 ```traceql
-{resource.service.name="tony_manual" && status=error}
+{resource.service.name="be_api" && status=error}
 ```
 
 ## Logs 與 Traces 的關聯
