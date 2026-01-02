@@ -11,7 +11,8 @@
       "Bash(curl:*)",
       "Bash(docker compose:*)",
       "Bash(jq:*)",
-      "WebFetch(domain:grafana.com)"
+      "WebFetch(domain:grafana.com)",
+      "Bash(mkdir:*)"
     ]
   }
 }

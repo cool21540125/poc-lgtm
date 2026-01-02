@@ -1,8 +1,8 @@
 import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
 import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
-const SERVICE_NAME = 'fe_web';
-const SERVICE_VERSION = '0.1.2';
+const SERVICE_NAME = 'fe_vue';
+const SERVICE_VERSION = '0.1.3';
 const ENVIRONMENT = import.meta.env.VITE_ENVIRONMENT || 'stag';
 
 // 初始化 Grafana Faro
@@ -36,7 +36,6 @@ export const faro = initializeFaro({
     persistent: true,
   },
 
-  // 移除測試用的 console.log，避免日誌無限遞迴
   beforeSend: (item) => {
     return item;
   },

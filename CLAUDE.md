@@ -21,7 +21,15 @@ ob-loki-alloy/
 │   ├── test-api.rest    # REST Client 測試檔案
 │   ├── TESTING_GUIDE.md # 完整測試指南
 │   └── README.md        # Backend 詳細說明
-├── frontend/            # Frontend Web UI（待實作）
+├── frontend/         # Frontend Web UI (Vue 3 + Faro SDK)
+│   ├── src/
+│   │   ├── App.vue
+│   │   ├── main.js
+│   │   ├── instrumentation.js  # Faro SDK 配置
+│   │   └── components/
+│   ├── package.json
+│   ├── vite.config.js
+│   └── README.md
 ├── lgtm/               # LGTM 觀測堆疊
 │   ├── docker-compose.yaml
 │   ├── config.alloy    # Alloy OTLP receiver & pipeline
@@ -158,6 +166,7 @@ Alloy pipeline 配置，包含：
 
 ## Service Ports
 
+- **Frontend Vue**: 5173
 - **Backend API**: 3000
 - **Grafana**: 3001 (mapped from internal 3000)
 - **Loki HTTP**: 3100
@@ -171,12 +180,26 @@ Alloy pipeline 配置，包含：
 - **Alloy UI**: 12345
 - **Alloy Faro**: 12347
 
-## Next Steps
+## Frontend Implementation
 
-1. Implement Frontend Web UI in `frontend/`
-2. Create UI components to call backend APIs
-3. Demonstrate distributed tracing value through UI interactions
-4. Show how traces help debug request flows across frontend → backend → database
+Frontend Web UI 已使用 **Vue 3** 實作，位於 `frontend/`：
+
+- **技術**: Vue 3 Composition API + Vite
+- **Observability**: Grafana Faro SDK 2.1.0 (auto instrumentation)
+- **Service Name**: `fe_vue`
+- **Port**: 5173
+- **功能**: 註冊、登入、登出、查看用戶列表
+- **Trace Propagation**: 自動注入 W3C Trace Context headers 到 Backend API 請求
+
+### 啟動 Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+訪問 http://localhost:5173
 
 ## Troubleshooting
 
