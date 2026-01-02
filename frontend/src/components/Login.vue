@@ -39,6 +39,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { pushLog } from '../instrumentation';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -68,15 +69,34 @@ const handleSubmit = async () => {
     const data = await response.json();
 
     if (response.ok) {
+
+      pushLog(`用戶登入成功: ${data.username}`, 'info', {
+        username: data.username,
+        sessionId: data.sessionId,
+        action: 'login',
+      });
+
       emit('login-success', {
         username: data.username,
         sessionId: data.sessionId,
       });
     } else {
       error.value = data.error || '登入失敗';
+
+      pushLog(`用戶登入失敗: ${username.value} - ${data.error}`, 'error', {
+        username: username.value,
+        error: data.error,
+        action: 'login',
+      });
     }
   } catch (err) {
     error.value = '連接失敗，請確認 Backend 是否運行';
+
+    pushLog(`連接失敗: ${err.message}`, 'error', {
+      component: 'Login',
+      action: 'login',
+      username: username.value,
+    });
   } finally {
     loading.value = false;
   }

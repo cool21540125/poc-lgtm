@@ -12,7 +12,9 @@
       "Bash(docker compose:*)",
       "Bash(jq:*)",
       "WebFetch(domain:grafana.com)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(export LOKI_ADDR=http://localhost:3100)",
+      "Bash(logcli query '{service_name=\"\"fe_vue\"\"}' --limit=20 --output=jsonl)"
     ]
   }
 }

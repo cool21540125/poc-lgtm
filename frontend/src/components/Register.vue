@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { pushEvent, pushError } from '../instrumentation';
+import { pushEvent, pushError, pushLog } from '../instrumentation';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -71,10 +71,16 @@ const handleSubmit = async () => {
     const data = await response.json();
 
     if (response.ok) {
-      // 發送註冊成功事件到 Faro
+      // Faro Event
       pushEvent('user_register_success', {
         username: data.username,
         timestamp: new Date().toISOString(),
+      });
+
+      // Faro Log
+      pushLog(`用戶註冊成功: ${data.username}`, 'info', {
+        username: data.username,
+        action: 'register',
       });
 
       alert(`註冊成功！用戶：${data.username}`);
@@ -82,18 +88,28 @@ const handleSubmit = async () => {
     } else {
       error.value = data.error || '註冊失敗';
 
-      // 發送註冊失敗事件到 Faro
       pushEvent('user_register_failed', {
         username: username.value,
         error: data.error,
         timestamp: new Date().toISOString(),
       });
+
+      pushLog(`用戶註冊失敗: ${username.value} - ${data.error}`, 'error', {
+        username: username.value,
+        error: data.error,
+        action: 'register',
+      });
     }
   } catch (err) {
     error.value = '連接失敗，請確認 Backend 是否運行';
 
-    // 發送錯誤到 Faro
     pushError(err, {
+      component: 'Register',
+      action: 'register',
+      username: username.value,
+    });
+
+    pushLog(`連接失敗: ${err.message}`, 'error', {
       component: 'Register',
       action: 'register',
       username: username.value,

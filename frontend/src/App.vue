@@ -35,7 +35,7 @@ import { ref } from 'vue';
 import Login from './components/Login.vue';
 import Register from './components/Register.vue';
 import Dashboard from './components/Dashboard.vue';
-import { pushEvent, setUser as setFaroUser } from './instrumentation';
+import { pushEvent, pushLog, setUser as setFaroUser } from './instrumentation';
 
 const currentView = ref('login'); // 'login', 'register', 'dashboard'
 const user = ref(null); // { username, sessionId }
@@ -50,6 +50,12 @@ const handleLoginSuccess = (userData) => {
     username: userData.username,
     timestamp: new Date().toISOString(),
   });
+
+  pushLog(`用戶進入 Dashboard: ${userData.username}`, 'info', {
+    username: userData.username,
+    sessionId: userData.sessionId,
+    view: 'dashboard',
+  });
 };
 
 const handleRegisterSuccess = () => {
@@ -57,10 +63,18 @@ const handleRegisterSuccess = () => {
 };
 
 const handleLogout = () => {
-  // 發送登出事件到 Faro
+  const username = user.value?.username;
+
+  // TODO: 比較 - Event
   pushEvent('user_logout', {
-    username: user.value?.username,
+    username,
     timestamp: new Date().toISOString(),
+  });
+
+  // TODO: 比較 - Log
+  pushLog(`用戶登出: ${username}`, 'info', {
+    username,
+    action: 'logout',
   });
 
   user.value = null;
