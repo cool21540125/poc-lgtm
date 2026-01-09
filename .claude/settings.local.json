@@ -14,7 +14,7 @@
       "WebFetch(domain:grafana.com)",
       "Bash(mkdir:*)",
       "Bash(export LOKI_ADDR=http://localhost:3100)",
-      "Bash(logcli query '{service_name=\"\"fe_vue\"\"}' --limit=20 --output=jsonl)"
+      "Bash(logcli query '{service_name=\"\"fe_web\"\"}' --limit=20 --output=jsonl)"
     ]
   }
 }

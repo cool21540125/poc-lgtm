@@ -126,7 +126,7 @@ frontend/
 
 在 `src/instrumentation.js` 中配置：
 
-- **Service Name**: `fe_vue`
+- **Service Name**: `fe_web`
 - **Service Version**: `0.1.0`
 - **Environment**: `stag` (可透過 `VITE_ENVIRONMENT` 環境變數覆蓋)
 - **Faro Collector URL**: `http://localhost:12347/collect` (Alloy Faro receiver)
@@ -163,9 +163,9 @@ Faro Tracing Instrumentation 會自動在 HTTP 請求中注入 trace headers：
 
 1. 訪問 http://localhost:3001
 2. 選擇 **Tempo** 查詢 traces
-   - 使用 `service.name="fe_vue"` 過濾前端 traces
+   - 使用 `service.name="fe_web"` 過濾前端 traces
 3. 選擇 **Loki** 查詢 logs
-   - 使用 `{service_name="fe_vue"}` 過濾前端 logs
+   - 使用 `{service_name="fe_web"}` 過濾前端 logs
 4. 點擊 log 中的 Trace ID 可跳轉到對應的 trace 查看完整請求鏈路
 
 ## 使用流程範例

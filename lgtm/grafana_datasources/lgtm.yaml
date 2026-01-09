@@ -9,3 +9,7 @@ datasources:
   type: tempo
   access: proxy
   url: http://tempo:3200
+- name: Mimir
+  type: prometheus
+  access: proxy
+  url: http://mimir:9009/prometheus

@@ -87,11 +87,11 @@ loki.process "frontend_logs" {
 // Backend Logs: Batch & Export
 otelcol.processor.batch "logs" {
 	output {
-		logs = [otelcol.exporter.loki.default.input]
+		logs = [otelcol.exporter.loki.single_loki.input]
 	}
 }
 
-otelcol.exporter.loki "default" {
+otelcol.exporter.loki "single_loki" {
 	forward_to = [loki.write.local.receiver]
 }
 
@@ -104,14 +104,57 @@ loki.write "local" {
 
 // ===== Traces Pipeline =====
 
-// Unified Traces: Batch & Export to Tempo
-otelcol.processor.batch "traces" {
+// ===== Metrics Pipeline (Spanmetrics) =====
+
+// Spanmetrics Connector: Generate RED metrics from traces
+otelcol.connector.spanmetrics "default" {
+	// Histogram configuration for latency metrics
+	histogram {
+		explicit {
+			buckets = ["10ms", "50ms", "100ms", "500ms", "1s", "2500ms", "5s", "10s"]
+		}
+	}
+
+	// Extract dimensions from span attributes
+	dimension {
+		name = "http.method"
+	}
+
+	dimension {
+		name = "http.status_code"
+	}
+
+	dimension {
+		name = "service.name"
+	}
+
 	output {
-		traces = [otelcol.exporter.otlp.tempo.input]
+		metrics = [otelcol.exporter.prometheus.single_mimir.input]
 	}
 }
 
-otelcol.exporter.otlp "tempo" {
+// Prometheus Remote Write Exporter to Mimir
+otelcol.exporter.prometheus "single_mimir" {
+	forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+prometheus.remote_write "mimir" {
+	endpoint {
+		url = "http://mimir:9009/api/v1/push"
+	}
+}
+
+// Unified Traces: Batch & Export to Tempo + Spanmetrics
+otelcol.processor.batch "traces" {
+	output {
+		traces = [
+			otelcol.exporter.otlp.single_tempo.input,
+			otelcol.connector.spanmetrics.default.input,
+		]
+	}
+}
+
+otelcol.exporter.otlp "single_tempo" {
 	client {
 		endpoint = "tempo:4317"
 

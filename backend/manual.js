@@ -3,6 +3,10 @@ const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-node');
 const { trace, SpanStatusCode } = require('@opentelemetry/api');
+const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
+const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
+const { SequelizeInstrumentation } = require('@opentelemetry/instrumentation-sequelize');
 
 // ===== OpenTelemetry Logging Setup =====
 const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk-logs');
@@ -26,6 +30,29 @@ const tracerProvider = new NodeTracerProvider({
   }))]
 });
 tracerProvider.register();
+
+// 註冊 HTTP、Express 和 Sequelize 自動 instrumentation
+registerInstrumentations({
+  tracerProvider: tracerProvider,
+  instrumentations: [
+    new HttpInstrumentation({
+      // 確保能夠接收和傳播 trace context
+      headersToSpanAttributes: {
+        server: {
+          requestHeaders: ['traceparent', 'tracestate'],
+        },
+      },
+    }),
+    new ExpressInstrumentation(),
+    new SequelizeInstrumentation({
+      // 啟用 SQL 語句記錄（會顯示完整的 SQL 查詢）
+      // responseHook: (span, response) => {
+      //   // 可以在這裡添加自定義屬性
+      // }
+    }),
+  ],
+});
+
 const tracer = trace.getTracer('be_api', '0.1.0');
 
 // ===== Logging Provider =====

@@ -10,34 +10,49 @@ services:
     ports:
       - "3100:3100" # Loki HTTP
       - "9095:9095" # Loki gRPC
-    # volumes:
-    #   - "./loki.yaml:/etc/loki/local-config.yaml"
+    volumes:
+      - "./loki.yaml:/etc/loki/local-config.yaml"
     command: 
       - -config.file=/etc/loki/local-config.yaml
       - -target=all
       - -config.expand-env=true
     networks:
-      - observability
+      - net_ob
 
   tempo:
     image: grafana/tempo:2.9.0
     container_name: tempo
     hostname: tempo
-    restart: always 
+    restart: always
     ports:
-      - "9096:9095"  # Tempo gRPC
       - "3200:3200"  # Tempo HTTP
-      # - "14268:14268" # jaeger ingest
+      - "9096:9095"  # Tempo gRPC
       # - "14317:4317" # Tempo 的 otlp grpc
-      # - "14318:4318" # Tempo 的 otlp http
+      - "14318:4318" # Tempo 的 otlp http
     volumes:
-      - ./tempo-standalone.yaml:/etc/tempo/tempo.yaml
+      - ./tempo.yaml:/etc/tempo/tempo.yaml
     command:
       - -config.file=/etc/tempo/tempo.yaml
       - -target=all
       - -config.expand-env=true
     networks:
-      - observability
+      - net_ob
+
+  mimir:
+    image: grafana/mimir:3.0.2
+    container_name: mimir
+    hostname: mimir
+    restart: always
+    ports:
+      - "9009:9009"  # Mimir HTTP (Prometheus remote write/query)
+      - "9097:9095"  # Mimir gRPC
+    volumes:
+      - ./mimir.yaml:/etc/mimir/mimir.yaml
+    command:
+      - -config.file=/etc/mimir/mimir.yaml
+      - -target=all
+    networks:
+      - net_ob
 
   alloy:
     image: grafana/alloy:v1.12.1
@@ -57,10 +72,11 @@ services:
       - --server.http.listen-addr=0.0.0.0:12345
       - --stability.level=experimental # 啟用 DEBUG 的話必須要有這行
     networks:
-      - observability
+      - net_ob
     depends_on:
       - loki
       - tempo
+      - mimir
     logging:
       driver: "json-file"
       options:
@@ -81,11 +97,12 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     networks:
-      - observability
+      - net_ob
     depends_on:
       - loki
       - tempo
+      - mimir
 
 networks:
-  observability:
-    name: observability
+  net_ob:
+    name: net_ob

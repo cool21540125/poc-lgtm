@@ -1,7 +1,7 @@
 import { initializeFaro, getWebInstrumentations } from '@grafana/faro-web-sdk';
 import { TracingInstrumentation } from '@grafana/faro-web-tracing';
 
-const SERVICE_NAME = 'fe_vue';
+const SERVICE_NAME = 'fe_web';
 const ENVIRONMENT = import.meta.env.VITE_ENVIRONMENT || 'stag';
 
 // 初始化 Grafana Faro

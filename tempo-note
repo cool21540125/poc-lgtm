@@ -1,0 +1,221 @@
+⏺ Tempo 配置文件解讀
+
+  1. 全域設定 (1-3)
+
+  auth_enabled: false              # 關閉身份驗證（POC 適用）
+  stream_over_http_enabled: true   # 允許使用 HTTP 串流查詢
+  multitenancy_enabled: false      # 單租戶模式
+
+  用途：
+  - auth_enabled: false - 不需要 API token，適合內網/開發環境
+  - stream_over_http_enabled - 啟用大型 trace 的串流傳輸，避免超時
+  - multitenancy_enabled: false - 不區分組織/租戶，所有 trace 存在同一個 namespace
+
+  業界實務：
+  - POC/Dev: 全關（和你一樣）
+  - Staging: 啟用 multitenancy，區分團隊
+  - Production: 啟用 auth，搭配 Grafana/Nginx 做認證
+
+  ---
+  2. Server 配置 (5-8)
+
+  server:
+    grpc_listen_port: 9095  # Tempo 內部組件溝通（scalable mode）
+    http_listen_port: 3200  # Tempo API（查詢、健康檢查）
+    log_level: info
+
+  用途：
+  - 9095 - Tempo 各組件（distributor, ingester, querier）之間的 gRPC 通訊
+  - 3200 - Grafana 查詢 trace 的入口（HTTP API）
+  - log_level: info - 日誌等級，debug 可以看更多細節
+
+  業界實務：
+  - Port 通常不改（Tempo 預設值）
+  - log_level: debug 用於排查問題
+  - Production 會分離組件到不同 pod/container（這裡用 -target=all 跑在單一 container）
+
+  ---
+  3. Distributor (10-17)
+
+  distributor:
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: "0.0.0.0:4318"  # OTLP/HTTP
+          grpc:
+            endpoint: "0.0.0.0:4317"  # OTLP/gRPC
+
+  用途：
+  - 接收來自 Alloy 的 OTLP traces
+  - 0.0.0.0 表示監聽所有網卡（container 內部使用）
+
+  業界實務：
+  - 大多直接用 Alloy/OpenTelemetry Collector 接收，再轉送到 Tempo
+  - 你的架構正確：App → Alloy → Tempo（不是直接 App → Tempo）
+  - 也有人接收 Jaeger/Zipkin 格式（加上 jaeger: 或 zipkin:）
+
+  ---
+  4. Ingester (19-20)
+
+  ingester:
+    max_block_duration: 5m  # 每 5 分鐘將 trace 寫入 block
+
+  用途：
+  - Ingester 負責將接收的 trace 寫入 WAL（Write-Ahead Log）
+  - max_block_duration 控制多久 flush 一次到 block file
+  - 越短：延遲越低，但產生更多小檔案
+  - 越長：減少檔案數，但查詢延遲變高
+
+  業界實務：
+  - Default: 30 分鐘（Tempo 預設）
+  - Low latency: 5-10 分鐘（你的配置）
+  - High throughput: 1-2 小時
+
+  ---
+  5. Compactor (22-29)
+
+  compactor:
+    disabled: false
+    ring:
+      kvstore:
+        store: memberlist      # 使用 memberlist 作為分散式協調
+        prefix: collectors/
+    compaction:
+      block_retention: 336h    # 保留 14 天
+
+  用途：
+  - Compactor 負責合併小 block，減少檔案數
+  - memberlist - 單機模式的分散式協調機制（不需要外部 etcd/consul）
+  - block_retention: 336h - Trace 保留 14 天後自動刪除
+
+  業界實務：
+  - POC: 7-14 天（你是 14 天）
+  - Production: 30-90 天（依法規要求）
+  - High volume: 3-7 天（成本考量）
+  - 如果要永久儲存，會改用 S3/GCS 作為 backend
+
+  ---
+  6. Storage (31-37)
+
+  storage:
+    trace:
+      backend: local           # 本地檔案系統
+      local:
+        path: /var/tempo/blocks  # Block 儲存路徑
+      wal:
+        path: /var/tempo/wal     # WAL 路徑
+
+  用途：
+  - backend: local - 使用本地檔案系統（POC 適用）
+  - WAL 是未 flush 的 trace 暫存區
+  - Blocks 是已完成的壓縮 trace 檔案
+
+  業界實務：
+  - POC/Dev: local（你的配置）
+  - Production:
+  backend: s3  # 或 gcs, azure
+  s3:
+    bucket: tempo-traces
+    endpoint: s3.amazonaws.com
+  - Hybrid: Local WAL + S3 Blocks（兼顧效能與成本）
+
+  ---
+  7. Query Frontend (39-41)
+
+  query_frontend:
+    search:
+      max_duration: 0s  # 無限制搜尋時間範圍
+
+  用途：
+  - max_duration: 0s - 允許查詢任意時間範圍的 trace
+  - 設定限制可以防止查詢過大範圍導致超時
+
+  業界實務：
+  - POC: 0s（無限制）
+  - Production: 168h（7 天）或 720h（30 天）
+  - 搭配 Grafana 的 time picker 限制
+
+  ---
+  8. Metrics Generator (44-58)
+
+  metrics_generator:
+    ring:
+      kvstore:
+        store: memberlist
+    storage:
+      path: /var/tempo/generator/wal
+      # remote_write:          # 註解掉
+      #   - url: http://prometheus:9090/api/v1/write
+
+  用途：
+  - Metrics Generator 可以從 trace 生成 RED metrics（Rate, Errors, Duration）
+  - 目前註解掉 remote_write，表示功能未啟用
+
+  業界實務：
+  - 啟用時的配置：
+  metrics_generator:
+    processor:
+      service_graphs:
+        enabled: true      # 生成服務依賴圖
+      span_metrics:
+        enabled: true      # 生成 span 維度 metrics
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+  - 使用場景：
+    - 想要從 trace 自動生成 Prometheus metrics
+    - 不想額外埋 metrics instrumentation
+    - 可以在 Grafana 用 Prometheus 查詢 trace 衍生的指標
+
+  ---
+  社群/業界常見配置模式
+
+  單機 POC（你的場景）
+
+  backend: local
+  auth_enabled: false
+  multitenancy_enabled: false
+  block_retention: 7-14d
+
+  小型 Production（單機 + 雲端儲存）
+
+  backend: s3
+  auth_enabled: true
+  multitenancy_enabled: false
+  block_retention: 30d
+  metrics_generator: enabled
+
+  中型 Production（分散式）
+
+  # 分離組件到不同 container
+  -target: distributor  # 接收 traces
+  -target: ingester     # 寫入
+  -target: querier      # 查詢
+  -target: compactor    # 壓縮
+
+  backend: s3
+  block_retention: 90d
+
+  高流量優化
+
+  - 增加 ingester replicas
+  - 調大 max_block_duration (1-2h)
+  - 使用 parquet 格式（預設）而非 json
+  - 啟用 bloom filters 加速查詢
+
+  ---
+  你的配置評價
+
+  ✅ 優點：
+  - 適合 POC，設定簡潔
+  - max_block_duration: 5m 查詢延遲低
+  - 14 天保留期合理
+
+  ⚠️ 改善建議（未來考慮）：
+  - 啟用 metrics_generator 可以自動生成 service graph
+  - 如果要長期使用，考慮改用 S3/MinIO
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>  
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ? for shortcuts

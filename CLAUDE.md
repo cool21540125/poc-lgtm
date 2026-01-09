@@ -186,7 +186,7 @@ Frontend Web UI 已使用 **Vue 3** 實作，位於 `frontend/`：
 
 - **技術**: Vue 3 Composition API + Vite
 - **Observability**: Grafana Faro SDK 2.1.0 (auto instrumentation)
-- **Service Name**: `fe_vue`
+- **Service Name**: `fe_web`
 - **Port**: 5173
 - **功能**: 註冊、登入、登出、查看用戶列表
 - **Trace Propagation**: 自動注入 W3C Trace Context headers 到 Backend API 請求

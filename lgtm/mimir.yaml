@@ -1,0 +1,64 @@
+# Mimir Monolithic Mode Configuration
+# Single-node deployment for development/testing
+
+target: all
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: info
+
+# Common storage configuration
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data/mimir
+
+# Blocks storage for time-series data
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/mimir/blocks
+  tsdb:
+    dir: /data/mimir/tsdb
+
+# Compactor configuration
+compactor:
+  data_dir: /data/mimir/compactor
+  compaction_interval: 30m
+
+# Ingester configuration
+ingester:
+  ring:
+    replication_factor: 1
+
+# Distributor configuration
+distributor:
+  ring:
+    kvstore:
+      store: memberlist
+
+# Ruler storage
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/mimir/rules
+
+# Alertmanager storage
+alertmanager_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/mimir/alertmanager
+
+# Limits configuration (relaxed for development)
+limits:
+  ingestion_rate: 100000
+  ingestion_burst_size: 200000
+  max_global_series_per_user: 0
+  max_global_series_per_metric: 0
+
+# Memberlist configuration for ring
+memberlist:
+  join_members: ["mimir:7946"]
+  bind_port: 7946
