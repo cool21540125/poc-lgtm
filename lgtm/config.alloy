@@ -65,6 +65,7 @@ loki.process "frontend_logs" {
 			app_version            = "app_version",
 			app_environment        = "app_environment",
 			event_data_http_method = "event_data_http.method",
+			event_data_username    = "event_data_username",
 		}
 	}
 	// // Map fields to Loki labels
@@ -80,6 +81,7 @@ loki.process "frontend_logs" {
 	stage.structured_metadata {
 		values = {
 			http_method = "event_data_http_method",
+			username    = "event_data_username",
 		}
 	}
 }
