@@ -36,11 +36,13 @@ registerInstrumentations({
   tracerProvider: tracerProvider,
   instrumentations: [
     new HttpInstrumentation({
-      // 確保能夠接收和傳播 trace context
-      headersToSpanAttributes: {
-        server: {
-          requestHeaders: ['traceparent', 'tracestate'],
-        },
+      // OpenTelemetry 會自動接收和傳播 W3C Trace Context (traceparent, tracestate)
+      ignoreIncomingRequestHook: (req) => {
+        // Ignore OPTIONS requests
+        if (req.method === 'OPTIONS') {
+          return true;
+        }
+        return false;
       },
     }),
     new ExpressInstrumentation(),
@@ -52,8 +54,6 @@ registerInstrumentations({
     }),
   ],
 });
-
-const tracer = trace.getTracer('be_api', '0.1.0');
 
 // ===== Logging Provider =====
 const loggerProvider = new LoggerProvider({
@@ -122,26 +122,25 @@ app.use(corsMiddleware);
 // ===== API =====
 
 app.post('/register', async (req, res) => {
-  // 手動創建 Span：註冊操作
-  const span = tracer.startSpan('user.register', {
-    attributes: {
-      'operation.type': 'user_registration',
-      'http.method': 'POST',
-      'http.route': '/register',
-    }
-  });
-
   const { username, password } = req.body;
 
-  // 添加用戶名到 span 屬性
-  if (username) {
-    span.setAttribute('user.username', username);
+  // 使用 auto-instrumentation 建立的 active span
+  const span = trace.getActiveSpan();
+
+  // 添加業務相關屬性到 auto span
+  if (span) {
+    span.setAttribute('operation.type', 'user_registration');
+    if (username) {
+      span.setAttribute('user.username', username);
+    }
   }
 
   if (!username || !password) {
-    span.setAttribute('error.type', 'validation_error');
-    span.setAttribute('error.field', !username ? 'username' : 'password');
-    span.setStatus({ code: SpanStatusCode.ERROR, message: '缺少必要欄位' });
+    if (span) {
+      span.setAttribute('error.type', 'validation_error');
+      span.setAttribute('error.field', !username ? 'username' : 'password');
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '缺少必要欄位' });
+    }
 
     log.error('註冊失敗：缺少必要欄位', {
       'user.username': username || 'undefined',
@@ -150,16 +149,17 @@ app.post('/register', async (req, res) => {
       'request.id': req.requestId,
     });
 
-    span.end();
     return res.status(400).json({ error: '請提供帳號和密碼' });
   }
 
   try {
     const { user, totalUsers } = await userService.registerUser(username, password);
 
-    span.setAttribute('user.action', 'register');
-    span.setAttribute('users.total_count', totalUsers);
-    span.setStatus({ code: SpanStatusCode.OK });
+    if (span) {
+      span.setAttribute('user.action', 'register');
+      span.setAttribute('users.total_count', totalUsers);
+      span.setStatus({ code: SpanStatusCode.OK });
+    }
 
     log.info('註冊成功', {
       'user.username': username,
@@ -168,12 +168,13 @@ app.post('/register', async (req, res) => {
       'request.id': req.requestId,
     })
 
-    span.end();
     res.status(201).json({ message: '註冊成功', username: user.username });
   } catch (error) {
     if (error.message === 'USER_EXISTS') {
-      span.setAttribute('error.type', 'conflict');
-      span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號已存在' });
+      if (span) {
+        span.setAttribute('error.type', 'conflict');
+        span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號已存在' });
+      }
 
       log.error('註冊失敗：帳號已存在', {
         'user.username': username,
@@ -181,13 +182,14 @@ app.post('/register', async (req, res) => {
         'request.id': req.requestId,
       });
 
-      span.end();
       return res.status(409).json({ error: '帳號已存在' });
     }
 
-    span.setAttribute('error.type', 'database_error');
-    span.setAttribute('error.message', error.message);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
+    if (span) {
+      span.setAttribute('error.type', 'database_error');
+      span.setAttribute('error.message', error.message);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
+    }
 
     log.error('註冊失敗：數據庫錯誤', {
       'user.username': username,
@@ -196,42 +198,35 @@ app.post('/register', async (req, res) => {
       'request.id': req.requestId,
     });
 
-    span.end();
     res.status(500).json({ error: '註冊失敗，請稍後再試' });
   }
 });
 
 app.post('/login', async (req, res) => {
-  // 手動創建 Span：登入操作
-  const span = tracer.startSpan('user.login', {
-    attributes: {
-      'operation.type': 'user_authentication',
-      'http.method': 'POST',
-      'http.route': '/login',
-    }
-  });
-
   const { username, password } = req.body;
 
-  if (username) {
-    span.setAttribute('user.username', username);
+  // 使用 auto-instrumentation 建立的 active span
+  const span = trace.getActiveSpan();
+
+  // 添加業務相關屬性
+  if (span) {
+    span.setAttribute('operation.type', 'user_authentication');
+    if (username) {
+      span.setAttribute('user.username', username);
+    }
   }
 
-  log.info('開始處理登入請求', {
-    'user.username': username,
-    'request.id': req.requestId,
-  });
-
   if (!username || !password) {
-    span.setAttribute('error.type', 'validation_error');
-    span.setStatus({ code: SpanStatusCode.ERROR, message: '缺少必要欄位' });
+    if (span) {
+      span.setAttribute('error.type', 'validation_error');
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '缺少必要欄位' });
+    }
 
     log.error('登入失敗：缺少必要欄位', {
       'error.type': 'validation_error',
       'request.id': req.requestId,
     });
 
-    span.end();
     return res.status(400).json({ error: '請提供帳號和密碼' });
   }
 
@@ -239,14 +234,15 @@ app.post('/login', async (req, res) => {
     const sessionId = generateSessionId();
     const { user, activeSessions } = await userService.loginUser(username, password, sessionId);
 
-    span.setAttribute('user.action', 'login');
-    span.setAttribute('session.id', sessionId);
-    span.setAttribute('sessions.active_count', activeSessions);
-    span.setStatus({ code: SpanStatusCode.OK });
+    if (span) {
+      span.setAttribute('user.action', 'login');
+      span.setAttribute('session.id', sessionId);
+      span.setAttribute('sessions.active_count', activeSessions);
+      span.setStatus({ code: SpanStatusCode.OK });
+    }
 
     log.info(`${username} - 用戶登入成功`);
 
-    span.end();
     res.status(200).json({
       message: '登入成功',
       sessionId,
@@ -254,9 +250,11 @@ app.post('/login', async (req, res) => {
     });
   } catch (error) {
     if (error.message === 'USER_NOT_FOUND' || error.message === 'INVALID_PASSWORD') {
-      span.setAttribute('error.type', 'authentication_failed');
-      span.setAttribute('error.reason', error.message === 'USER_NOT_FOUND' ? 'user_not_found' : 'invalid_password');
-      span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號或密碼錯誤' });
+      if (span) {
+        span.setAttribute('error.type', 'authentication_failed');
+        span.setAttribute('error.reason', error.message === 'USER_NOT_FOUND' ? 'user_not_found' : 'invalid_password');
+        span.setStatus({ code: SpanStatusCode.ERROR, message: '帳號或密碼錯誤' });
+      }
 
       log.error('登入失敗：帳號或密碼錯誤', {
         'user.username': username,
@@ -265,13 +263,14 @@ app.post('/login', async (req, res) => {
         'request.id': req.requestId,
       });
 
-      span.end();
       return res.status(401).json({ error: '帳號或密碼錯誤' });
     }
 
-    span.setAttribute('error.type', 'database_error');
-    span.setAttribute('error.message', error.message);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
+    if (span) {
+      span.setAttribute('error.type', 'database_error');
+      span.setAttribute('error.message', error.message);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
+    }
 
     log.error('登入失敗：數據庫錯誤', {
       'user.username': username,
@@ -280,47 +279,47 @@ app.post('/login', async (req, res) => {
       'request.id': req.requestId,
     });
 
-    span.end();
     res.status(500).json({ error: '登入失敗，請稍後再試' });
   }
 });
 
 app.post('/logout', async (req, res) => {
-  // 手動創建 Span：登出操作
-  const span = tracer.startSpan('user.logout', {
-    attributes: {
-      'operation.type': 'user_logout',
-      'http.method': 'POST',
-      'http.route': '/logout',
-    }
-  });
-
   const { sessionId } = req.body;
 
-  if (sessionId) {
-    span.setAttribute('session.id', sessionId);
+  // 使用 auto-instrumentation 建立的 active span
+  const span = trace.getActiveSpan();
+
+  // 添加業務相關屬性
+  if (span) {
+    span.setAttribute('operation.type', 'user_logout');
+    if (sessionId) {
+      span.setAttribute('session.id', sessionId);
+    }
   }
 
   if (!sessionId) {
-    span.setAttribute('error.type', 'validation_error');
-    span.setStatus({ code: SpanStatusCode.ERROR, message: '缺少 sessionId' });
+    if (span) {
+      span.setAttribute('error.type', 'validation_error');
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '缺少 sessionId' });
+    }
 
     log.error('登出失敗：缺少 sessionId', {
       'error.type': 'validation_error',
       'request.id': req.requestId,
     });
 
-    span.end();
     return res.status(400).json({ error: '請提供 sessionId' });
   }
 
   try {
     const { username, remainingSessions } = await userService.logoutUser(sessionId);
 
-    span.setAttribute('user.username', username);
-    span.setAttribute('user.action', 'logout');
-    span.setAttribute('sessions.remaining_count', remainingSessions);
-    span.setStatus({ code: SpanStatusCode.OK });
+    if (span) {
+      span.setAttribute('user.username', username);
+      span.setAttribute('user.action', 'logout');
+      span.setAttribute('sessions.remaining_count', remainingSessions);
+      span.setStatus({ code: SpanStatusCode.OK });
+    }
 
     log.info('用戶登出成功', {
       'user.username': username,
@@ -330,12 +329,13 @@ app.post('/logout', async (req, res) => {
       'request.id': req.requestId,
     });
 
-    span.end();
     res.status(200).json({ message: '登出成功' });
   } catch (error) {
     if (error.message === 'SESSION_NOT_FOUND') {
-      span.setAttribute('error.type', 'session_not_found');
-      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Session 不存在或已過期' });
+      if (span) {
+        span.setAttribute('error.type', 'session_not_found');
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Session 不存在或已過期' });
+      }
 
       log.error('登出失敗：Session 不存在或已過期', {
         'session.id': sessionId,
@@ -343,13 +343,14 @@ app.post('/logout', async (req, res) => {
         'request.id': req.requestId,
       });
 
-      span.end();
       return res.status(404).json({ error: 'Session 不存在或已過期' });
     }
 
-    span.setAttribute('error.type', 'database_error');
-    span.setAttribute('error.message', error.message);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
+    if (span) {
+      span.setAttribute('error.type', 'database_error');
+      span.setAttribute('error.message', error.message);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '數據庫錯誤' });
+    }
 
     log.error('登出失敗：數據庫錯誤', {
       'session.id': sessionId,
@@ -358,7 +359,6 @@ app.post('/logout', async (req, res) => {
       'request.id': req.requestId,
     });
 
-    span.end();
     res.status(500).json({ error: '登出失敗，請稍後再試' });
   }
 });

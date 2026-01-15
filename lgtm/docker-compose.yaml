@@ -1,5 +1,11 @@
 name: ob-poc
 
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "8"
+
 services:
 
   loki:
@@ -11,13 +17,16 @@ services:
       - "3100:3100" # Loki HTTP
       - "9095:9095" # Loki gRPC
     volumes:
-      - "./loki.yaml:/etc/loki/local-config.yaml"
+      - "./loki.yaml:/etc/loki/loki-config.yaml"
     command: 
-      - -config.file=/etc/loki/local-config.yaml
-      - -target=all
-      - -config.expand-env=true
+      [ 
+        "-config.file=/etc/loki/loki-config.yaml",
+        "-config.expand-env=true",
+        "-target=all",
+      ]
     networks:
       - net_ob
+    logging: *default-logging
 
   tempo:
     image: grafana/tempo:2.9.0
@@ -25,18 +34,22 @@ services:
     hostname: tempo
     restart: always
     ports:
-      - "3200:3200"  # Tempo HTTP
-      - "9096:9095"  # Tempo gRPC
-      # - "14317:4317" # Tempo 的 otlp grpc
-      - "14318:4318" # Tempo 的 otlp http
+      - "3200:3200"  # Tempo API for HTTP query
+      - "14318:4318" # OTLP over HTTP
+      - "14317:4317" # OTLP over gRPC
+      # - "9096:9095"  # Tempo gRPC
     volumes:
-      - ./tempo.yaml:/etc/tempo/tempo.yaml
+      - "./tempo.yaml:/etc/tempo/tempo-config.yaml"
+      # - "./mnt_tempo:/var/tempo"
     command:
-      - -config.file=/etc/tempo/tempo.yaml
-      - -target=all
-      - -config.expand-env=true
+      [
+        "-config.file=/etc/tempo/tempo-config.yaml",
+        "-config.expand-env=true",
+        "-target=all",
+      ]
     networks:
       - net_ob
+    logging: *default-logging
 
   mimir:
     image: grafana/mimir:3.0.2
@@ -53,6 +66,7 @@ services:
       - -target=all
     networks:
       - net_ob
+    logging: *default-logging
 
   alloy:
     image: grafana/alloy:v1.12.1
@@ -77,11 +91,7 @@ services:
       - loki
       - tempo
       - mimir
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "3m"
-        max-file: "2"
+    logging: *default-logging
 
   grafana:
     image: grafana/grafana:12.3
@@ -91,7 +101,8 @@ services:
     ports:
       - "3001:3000"  # Grafana UI
     volumes:
-      - ./grafana_datasources:/etc/grafana/provisioning/datasources
+      - "./grafana.ini:/etc/grafana/grafana.ini"
+      - "./grafana_datasources:/etc/grafana/provisioning/datasources"
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
@@ -102,6 +113,7 @@ services:
       - loki
       - tempo
       - mimir
+    logging: *default-logging
 
 networks:
   net_ob:

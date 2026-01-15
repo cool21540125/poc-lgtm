@@ -35,6 +35,18 @@ export const faro = initializeFaro({
   },
 
   beforeSend: (item) => {
+    // 過濾 OPTIONS 請求的 traces 和 logs
+    if (item.type === 'trace' || item.type === 'log') {
+      const payload = item.payload || item;
+
+      // 檢查是否為 OPTIONS 請求
+      if (payload.http?.method === 'OPTIONS' ||
+          payload.event_data_http?.method === 'OPTIONS' ||
+          (typeof payload === 'string' && payload.includes('OPTIONS'))) {
+        return null; // 返回 null 表示丟棄此項
+      }
+    }
+
     return item;
   },
 });

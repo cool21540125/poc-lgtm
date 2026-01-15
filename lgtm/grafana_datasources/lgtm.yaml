@@ -5,11 +5,33 @@ datasources:
   type: loki
   access: proxy
   url: http://loki:3100
+- name: Mimir
+  type: prometheus
+  access: proxy
+  uid: mimir
+  url: http://mimir:9009/prometheus
 - name: Tempo
   type: tempo
   access: proxy
   url: http://tempo:3200
-- name: Mimir
-  type: prometheus
-  access: proxy
-  url: http://mimir:9009/prometheus
+  # jsonData:
+  #   serviceMap:
+  #     datasourceUid: mimir
+  #   tracesToMetrics:
+  #     datasourceUid: mimir
+  #     tags:
+  #       - key: service.name
+  #         value: service_name
+  #       - key: span.name
+  #         value: span_name
+  #       - key: http.status_code
+  #         value: http_status_code
+  #     queries:
+  #       - name: Request rate
+  #         query: rate(traces_span_metrics_calls_total{$$__tags}[2m])
+  #       - name: Error rate
+  #         query: rate(traces_span_metrics_calls_total{$$__tags,status_code="STATUS_CODE_ERROR"}[2m])
+  #       - name: Duration (avg)
+  #         query: rate(traces_span_metrics_duration_milliseconds_sum{$$__tags}[2m]) / rate(traces_span_metrics_duration_milliseconds_count{$$__tags}[2m])
+  #   nodeGraph:
+  #     enabled: true

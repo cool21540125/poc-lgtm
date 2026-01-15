@@ -1,11 +1,10 @@
 auth_enabled: false
-stream_over_http_enabled: true
-multitenancy_enabled: false
+target: all
 
 server:
-  grpc_listen_port: 9095 # for tempo scalable usage
-  http_listen_port: 3200 # for Tempo API
+  http_listen_port: 3200
   log_level: info
+  log_format: json
 
 distributor:
   receivers:
@@ -15,11 +14,38 @@ distributor:
           endpoint: "0.0.0.0:4318"
         grpc:
           endpoint: "0.0.0.0:4317"
+  max_attribute_bytes: 2048 # default 2KB (attr超過則截斷)
+
+# Enable metrics_generator processors (required for metrics generation)
+overrides:
+  metrics_generator_processors:
+  - service-graphs
+  - span-metrics
+  - local-blocks  # Required for Grafana Traces Drilldown (TraceQL metrics)
+
+## ---- 用 CPU 換取 NetworkTraffic ----
+# https://grafana.com/docs/tempo/latest/configuration/#grpc-compression
+ingester_client:
+  grpc_client_config:
+    grpc_compression: "snappy"
+metrics_generator_client:
+  grpc_client_config:
+    grpc_compression: "snappy"
+querier:
+  frontend_worker:
+    grpc_client_config:
+      grpc_compression: "snappy"
+## ---- 用 CPU 換取 NetworkTraffic ----
+
+ingester:
+  trace_idle_period: 10s
+  trace_live_period: 1m
+  flush_all_on_shutdown: true # SingleBinary 啟用; MultiNodes 必須關閉
 
 compactor:
   disabled: false
   compaction:
-    block_retention: 336h # 14 days
+    block_retention: 336h # 14 days - trace 保存期限
 
 storage:
   trace:
@@ -33,18 +59,35 @@ query_frontend:
   search:
     max_duration: 0s
 
-# # https://grafana.com/docs/tempo/latest/configuration/#metrics-generator
+# https://grafana.com/docs/tempo/latest/configuration/#metrics-generator
 metrics_generator:
-  ring:
-    kvstore:
-      store: memberlist
-
+  registry:
+    external_labels:
+      source: tempo
+      cluster: poc
+  #   collection_interval: 15s
+  processor:
+    service_graphs:
+      dimensions: [ "environment" ]
+      histogram_buckets: [ 0.2, 0.5, 2, 5, 10, 15, 30 ]
+    span_metrics:
+      dimensions:
+      # 留意高基數
+      - http.method
+      - http.status_code
+      # - http.host
+      # - http.route
+      # - http.scheme
+      histogram_buckets: [ 0.2, 0.5, 2, 5, 10, 15, 30 ]
+    local_blocks:
+      # TraceQL metrics processor for Grafana Traces Drilldown
+      # Generates metrics from trace data for query performance
+      flush_to_storage: true
+      max_block_duration: 5m
+      max_block_bytes: 10485760  # 10MB
+      filter_server_spans: false
   storage:
     path: /var/tempo/generator/wal
-    # remote_write:
-    #   - url: http://prometheus:9090/api/v1/write
-    # processor:
-    #   service_graphs:
-    #     enabled: false
-    #   span_metrics:
-    #     enabled: false
+    remote_write:
+    - url: http://mimir:9009/api/v1/push
+      send_exemplars: true

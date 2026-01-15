@@ -1,5 +1,6 @@
 logging {
-	level = "debug"
+	level  = "debug"
+	format = "json"
 }
 
 otelcol.receiver.otlp "backend" {
@@ -9,27 +10,11 @@ otelcol.receiver.otlp "backend" {
 
 	output {
 		logs   = [otelcol.processor.attributes.backend_logs.input]
-		traces = [otelcol.processor.batch.traces.input]
+		traces = [otelcol.processor.batch.backend.input]
+		// metrics = [otelcol.processor.batch.backend.input]
 	}
 }
 
-// Frontend Faro Receiver (Logs + Traces)
-faro.receiver "frontend" {
-	server {
-		listen_address       = "0.0.0.0"
-		listen_port          = 12347
-		cors_allowed_origins = ["*"]
-	}
-
-	output {
-		logs   = [loki.process.frontend_logs.receiver]
-		traces = [otelcol.processor.batch.traces.input]
-	}
-}
-
-// ===== Logs Pipeline =====
-
-// Backend Logs: Add attributes & Loki hints
 otelcol.processor.attributes "backend_logs" {
 	action {
 		key    = "loki.resource.labels"
@@ -43,22 +28,56 @@ otelcol.processor.attributes "backend_logs" {
 		value  = "severity"
 	}
 
-	action {
-		key    = "loki.attribute.labels"
-		action = "insert"
-		value  = "environment.name"
-	}
-
 	output {
-		logs = [otelcol.processor.batch.logs.input]
+		logs = [otelcol.processor.batch.backend.input]
 	}
 }
 
-// Frontend Logs: Add labels & basic filtering
+otelcol.processor.batch "backend" {
+	output {
+		metrics = [
+			// otelcol.exporter.prometheus.default.input,
+			otelcol.exporter.otlp.single_tempo.input,
+		]
+		logs = [
+			otelcol.exporter.loki.single_loki.input,
+			otelcol.exporter.otlp.single_tempo.input,
+		]
+		traces = [
+			otelcol.exporter.otlp.single_tempo.input,
+		]
+	}
+}
+
+// ============ Faro ============
+faro.receiver "frontend" {
+	server {
+		listen_address       = "0.0.0.0"
+		listen_port          = 12347
+		cors_allowed_origins = ["*"]
+	}
+
+	output {
+		logs   = [loki.process.frontend_logs.receiver]
+		traces = [otelcol.processor.batch.frontend.input]
+	}
+}
+
+otelcol.processor.batch "frontend" {
+	timeout         = "5s"
+	send_batch_size = 2048
+
+	output {
+		logs   = [otelcol.exporter.loki.single_loki.input]
+		traces = [otelcol.exporter.otlp.single_tempo.input]
+		// metrics = [otelcol.exporter.prometheus.default.input]
+	}
+}
+
 loki.process "frontend_logs" {
 	forward_to = [loki.write.local.receiver]
 
-	// // // Extract fields from Faro payload
+	// Extract fields from Faro payload
 	stage.logfmt {
 		mapping = {
 			app_name               = "app_name",
@@ -68,7 +87,7 @@ loki.process "frontend_logs" {
 			event_data_username    = "event_data_username",
 		}
 	}
-	// // Map fields to Loki labels
+	// Map fields to Loki labels
 	stage.labels {
 		values = {
 			service_name    = "app_name",
@@ -86,83 +105,25 @@ loki.process "frontend_logs" {
 	}
 }
 
-// Backend Logs: Batch & Export
-otelcol.processor.batch "logs" {
-	output {
-		logs = [otelcol.exporter.loki.single_loki.input]
-	}
-}
-
+// ============ Loki ============
 otelcol.exporter.loki "single_loki" {
 	forward_to = [loki.write.local.receiver]
 }
 
-// Loki Write Endpoint
 loki.write "local" {
 	endpoint {
 		url = "http://loki:3100/loki/api/v1/push"
 	}
 }
 
-// ===== Traces Pipeline =====
-
-// ===== Metrics Pipeline (Spanmetrics) =====
-
-// Spanmetrics Connector: Generate RED metrics from traces
-otelcol.connector.spanmetrics "default" {
-	// Histogram configuration for latency metrics
-	histogram {
-		explicit {
-			buckets = ["10ms", "50ms", "100ms", "500ms", "1s", "2500ms", "5s", "10s"]
-		}
-	}
-
-	// Extract dimensions from span attributes
-	dimension {
-		name = "http.method"
-	}
-
-	dimension {
-		name = "http.status_code"
-	}
-
-	dimension {
-		name = "service.name"
-	}
-
-	output {
-		metrics = [otelcol.exporter.prometheus.single_mimir.input]
-	}
-}
-
-// Prometheus Remote Write Exporter to Mimir
-otelcol.exporter.prometheus "single_mimir" {
-	forward_to = [prometheus.remote_write.mimir.receiver]
-}
-
-prometheus.remote_write "mimir" {
-	endpoint {
-		url = "http://mimir:9009/api/v1/push"
-	}
-}
-
-// Unified Traces: Batch & Export to Tempo + Spanmetrics
-otelcol.processor.batch "traces" {
-	output {
-		traces = [
-			otelcol.exporter.otlp.single_tempo.input,
-			otelcol.connector.spanmetrics.default.input,
-		]
-	}
-}
-
+// ============ Tempo ============
 otelcol.exporter.otlp "single_tempo" {
 	client {
 		endpoint = "tempo:4317"
 
 		tls {
 			insecure             = true
-			insecure_skip_verify = false
+			insecure_skip_verify = true
 		}
 	}
 }
