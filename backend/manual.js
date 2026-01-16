@@ -6,7 +6,7 @@ const { trace, SpanStatusCode } = require('@opentelemetry/api');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
 const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
-const { SequelizeInstrumentation } = require('@opentelemetry/instrumentation-sequelize');
+// const { SequelizeInstrumentation } = require('@opentelemetry/instrumentation-sequelize');
 
 // ===== OpenTelemetry Logging Setup =====
 const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk-logs');
@@ -31,7 +31,7 @@ const tracerProvider = new NodeTracerProvider({
 });
 tracerProvider.register();
 
-// 註冊 HTTP、Express 和 Sequelize 自動 instrumentation
+// 註冊 HTTP 和 Express 自動 instrumentation
 registerInstrumentations({
   tracerProvider: tracerProvider,
   instrumentations: [
@@ -46,12 +46,13 @@ registerInstrumentations({
       },
     }),
     new ExpressInstrumentation(),
-    new SequelizeInstrumentation({
-      // 啟用 SQL 語句記錄（會顯示完整的 SQL 查詢）
-      // responseHook: (span, response) => {
-      //   // 可以在這裡添加自定義屬性
-      // }
-    }),
+    // Sequelize instrumentation 已移除，避免產生內部 SQL 查詢的 traces
+    // new SequelizeInstrumentation({
+    //   // 啟用 SQL 語句記錄（會顯示完整的 SQL 查詢）
+    //   // responseHook: (span, response) => {
+    //   //   // 可以在這裡添加自定義屬性
+    //   // }
+    // }),
   ],
 });
 
@@ -431,6 +432,99 @@ app.get('/user', async (req, res) => {
       'request.id': req.requestId,
     });
     res.status(500).json({ error: '查詢失敗，請稍後再試' });
+  }
+});
+
+app.post('/compute', async (req, res) => {
+  const startTime = Date.now();
+
+  // 使用 auto-instrumentation 建立的 active span
+  const span = trace.getActiveSpan();
+
+  // 隨機計算時間 1~3 秒
+  const computeDuration = Math.floor(Math.random() * 2000) + 1000; // 1000-3000ms
+
+  // 添加業務相關屬性
+  if (span) {
+    span.setAttribute('operation.type', 'cpu_compute');
+    span.setAttribute('compute.duration_ms', computeDuration);
+    span.setAttribute('compute.type', 'intensive');
+  }
+
+  log.info('開始 CPU 密集運算', {
+    'operation': 'cpu_compute',
+    'compute.duration_ms': computeDuration,
+    'request.id': req.requestId,
+  });
+
+  try {
+    // CPU 密集運算：計算質數
+    let result = 0;
+    const endTime = Date.now() + computeDuration;
+    let iterations = 0;
+
+    while (Date.now() < endTime) {
+      // 計算質數來消耗 CPU
+      let num = Math.floor(Math.random() * 10000) + 1000;
+      let isPrime = true;
+
+      for (let i = 2; i <= Math.sqrt(num); i++) {
+        if (num % i === 0) {
+          isPrime = false;
+          break;
+        }
+      }
+
+      if (isPrime) {
+        result = num;
+      }
+      iterations++;
+    }
+
+    const actualDuration = Date.now() - startTime;
+
+    if (span) {
+      span.setAttribute('compute.iterations', iterations);
+      span.setAttribute('compute.result', result);
+      span.setAttribute('compute.actual_duration_ms', actualDuration);
+      span.setStatus({ code: SpanStatusCode.OK });
+    }
+
+    log.info('CPU 運算完成', {
+      'operation': 'cpu_compute',
+      'compute.iterations': iterations,
+      'compute.result': result,
+      'compute.planned_duration_ms': computeDuration,
+      'compute.actual_duration_ms': actualDuration,
+      'request.id': req.requestId,
+    });
+
+    res.status(200).json({
+      message: 'CPU 運算完成',
+      result: result,
+      iterations: iterations,
+      plannedDuration: computeDuration,
+      actualDuration: actualDuration
+    });
+  } catch (error) {
+    const actualDuration = Date.now() - startTime;
+
+    if (span) {
+      span.setAttribute('error.type', 'compute_error');
+      span.setAttribute('error.message', error.message);
+      span.setAttribute('compute.actual_duration_ms', actualDuration);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: '運算失敗' });
+    }
+
+    log.error('CPU 運算失敗', {
+      'operation': 'cpu_compute',
+      'error.type': 'compute_error',
+      'error.message': error.message,
+      'compute.actual_duration_ms': actualDuration,
+      'request.id': req.requestId,
+    });
+
+    res.status(500).json({ error: '運算失敗，請稍後再試' });
   }
 });
 
