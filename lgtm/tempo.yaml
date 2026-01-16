@@ -28,6 +28,9 @@ querier:
   frontend_worker:
     grpc_client_config:
       grpc_compression: "snappy"
+query_frontend:
+  search:
+    max_duration: 0s
 
 ingester:
   trace_idle_period: 10s

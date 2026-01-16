@@ -26,12 +26,12 @@ datasources:
           value: span_name
         - key: http.status_code
           value: http_status_code
-  #     queries:
-  #       - name: Request rate
-  #         query: rate(traces_span_metrics_calls_total{$$__tags}[2m])
-  #       - name: Error rate
-  #         query: rate(traces_span_metrics_calls_total{$$__tags,status_code="STATUS_CODE_ERROR"}[2m])
-  #       - name: Duration (avg)
-  #         query: rate(traces_span_metrics_duration_milliseconds_sum{$$__tags}[2m]) / rate(traces_span_metrics_duration_milliseconds_count{$$__tags}[2m])
-  #   nodeGraph:
-  #     enabled: true
+      queries:
+        - name: Request rate
+          query: rate(traces_spanmetrics_calls_total{$$__tags}[2m])
+        - name: Error rate
+          query: rate(traces_spanmetrics_calls_total{$$__tags,status_code="STATUS_CODE_ERROR"}[2m])
+        - name: Duration (avg)
+          query: histogram_avg(rate(traces_spanmetrics_latency{$$__tags}[2m]))
+    nodeGraph:
+      enabled: true
