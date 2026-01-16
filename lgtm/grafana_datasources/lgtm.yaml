@@ -14,18 +14,18 @@ datasources:
   type: tempo
   access: proxy
   url: http://tempo:3200
-  # jsonData:
-  #   serviceMap:
-  #     datasourceUid: mimir
-  #   tracesToMetrics:
-  #     datasourceUid: mimir
-  #     tags:
-  #       - key: service.name
-  #         value: service_name
-  #       - key: span.name
-  #         value: span_name
-  #       - key: http.status_code
-  #         value: http_status_code
+  jsonData:
+    serviceMap:
+      datasourceUid: mimir
+    tracesToMetrics:
+      datasourceUid: mimir
+      tags:
+        - key: service.name
+          value: service_name
+        - key: span.name
+          value: span_name
+        - key: http.status_code
+          value: http_status_code
   #     queries:
   #       - name: Request rate
   #         query: rate(traces_span_metrics_calls_total{$$__tags}[2m])

@@ -16,13 +16,6 @@ distributor:
           endpoint: "0.0.0.0:4317"
   max_attribute_bytes: 2048 # default 2KB (attr超過則截斷)
 
-# Enable metrics_generator processors (required for metrics generation)
-overrides:
-  metrics_generator_processors:
-  - service-graphs
-  - span-metrics
-  - local-blocks  # Required for Grafana Traces Drilldown (TraceQL metrics)
-
 ## ---- 用 CPU 換取 NetworkTraffic ----
 # https://grafana.com/docs/tempo/latest/configuration/#grpc-compression
 ingester_client:
@@ -64,8 +57,11 @@ metrics_generator:
   registry:
     external_labels:
       source: tempo
-      cluster: poc
-  #   collection_interval: 15s
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+    - url: http://mimir:9009/api/v1/push
+      send_exemplars: true
   processor:
     service_graphs:
       dimensions: [ "environment" ]
@@ -86,8 +82,11 @@ metrics_generator:
       max_block_duration: 5m
       max_block_bytes: 10485760  # 10MB
       filter_server_spans: false
-  storage:
-    path: /var/tempo/generator/wal
-    remote_write:
-    - url: http://mimir:9009/api/v1/push
-      send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics
+        - local-blocks
