@@ -16,8 +16,8 @@ distributor:
           endpoint: "0.0.0.0:4317"
   max_attribute_bytes: 2048 # default 2KB (attr超過則截斷)
 
-## ---- 用 CPU 換取 NetworkTraffic ----
-# https://grafana.com/docs/tempo/latest/configuration/#grpc-compression
+## grpc_compression: snappy - 用 CPU 換取 NetworkTraffic
+#     https://grafana.com/docs/tempo/latest/configuration/#grpc-compression
 ingester_client:
   grpc_client_config:
     grpc_compression: "snappy"
@@ -28,7 +28,6 @@ querier:
   frontend_worker:
     grpc_client_config:
       grpc_compression: "snappy"
-## ---- 用 CPU 換取 NetworkTraffic ----
 
 ingester:
   trace_idle_period: 10s
@@ -47,10 +46,6 @@ storage:
       path: /var/tempo/blocks
     wal:
       path: /var/tempo/wal
-
-query_frontend:
-  search:
-    max_duration: 0s
 
 # https://grafana.com/docs/tempo/latest/configuration/#metrics-generator
 metrics_generator:
