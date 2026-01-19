@@ -68,19 +68,31 @@ metrics_generator:
     remote_write:
     - url: http://mimir:9009/api/v1/push
       send_exemplars: true
+  # local-blocks processor 需要 traces WAL
+  traces_storage:
+    path: /var/tempo/generator/traces_wal
   processor:
     service_graphs:
-      dimensions: [ "environment" ]
+      dimensions: []
       histogram_buckets: [ 0.2, 0.5, 2, 5, 10, 15, 30 ]
+      # # 支援新版 OTel semantic conventions
+      # peer_attributes:
+      #   - peer.service
+      #   - server.address
+      #   - db.system.name      # 新版 (舊版: db.system)
+      #   - db.namespace        # 新版 (舊版: db.name)
+      #   - db.system
+      #   - db.name
+      # enable_virtual_node_label: true
     span_metrics:
-      dimensions:
-      # 留意高基數
-      - http.method
-      - http.status_code
-      # - http.host
-      # - http.route
-      # - http.scheme
       histogram_buckets: [ 0.2, 0.5, 2, 5, 10, 15, 30 ]
+      dimensions: []
+      # # 留意高基數
+      # - http.method
+      # - http.status_code
+      # # - http.host
+      # # - http.route
+      # # - http.scheme
     local_blocks:
       # TraceQL metrics processor for Grafana Traces Drilldown
       # Generates metrics from trace data for query performance
