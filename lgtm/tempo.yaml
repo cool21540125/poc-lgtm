@@ -75,14 +75,9 @@ metrics_generator:
     service_graphs:
       dimensions: []
       histogram_buckets: [ 0.2, 0.5, 2, 5, 10, 15, 30 ]
-      # # 支援新版 OTel semantic conventions
-      # peer_attributes:
-      #   - peer.service
-      #   - server.address
-      #   - db.system.name      # 新版 (舊版: db.system)
-      #   - db.namespace        # 新版 (舊版: db.name)
-      #   - db.system
-      #   - db.name
+      # 支援新版 OTel semantic conventions
+      peer_attributes:
+        - peer.service
       # enable_virtual_node_label: true
     span_metrics:
       histogram_buckets: [ 0.2, 0.5, 2, 5, 10, 15, 30 ]

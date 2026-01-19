@@ -46,12 +46,11 @@ registerInstrumentations({
       },
     }),
     new ExpressInstrumentation(),
-    // // Sequelize instrumentation 已移除，避免產生內部 SQL 查詢的 traces
     new SequelizeInstrumentation({
-      // 啟用 SQL 語句記錄（會顯示完整的 SQL 查詢）
-      // responseHook: (span, response) => {
-      //   // 可以在這裡添加自定義屬性
-      // }
+      // 設定 peer.service 讓 Service Graph 顯示正確的服務名稱
+      queryHook: (span, { sql, option }) => {
+        span.setAttribute('peer.service', 'mysql');
+      },
     }),
   ],
 });
