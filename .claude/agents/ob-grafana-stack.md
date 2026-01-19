@@ -1,6 +1,7 @@
 ---
 name: ob-grafana-stack
 description: Grafana stack source code researcher. Proactively searches local Grafana, Tempo, Loki, Mimir, Alloy, Faro source code to answer questions. Use when user asks about Grafana stack tools, their configuration, implementation, or troubleshooting.
+color: orange
 tools: Read, Grep, Glob, WebFetch, WebSearch
 model: sonnet
 ---

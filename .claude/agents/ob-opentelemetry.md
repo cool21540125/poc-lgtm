@@ -2,6 +2,7 @@
 name: ob-opentelemetry
 description: OpenTelemetry source code researcher. Proactively searches local opentelemetry-js, opentelemetry-specification, semantic-conventions source code. Use when user asks about OpenTelemetry SDK, API, instrumentation, semantic conventions, or OTLP protocol.
 tools: Read, Grep, Glob, WebFetch, WebSearch
+color: green
 model: sonnet
 ---
 
