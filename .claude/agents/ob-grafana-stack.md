@@ -53,15 +53,15 @@ cd ~/src/Observability/faro-web-sdk && git checkout v2.1.0
 
 ## 原始碼位置
 
-| Service      | Path                             |
-|--------------|----------------------------------|
-| grafana      | ~/src/Observability/grafana      |
-| mimir        | ~/src/Observability/mimir        |
-| loki         | ~/src/Observability/loki         |
-| tempo        | ~/src/Observability/tempo        |
-| alloy        | ~/src/Observability/alloy        |
-| faro         | ~/src/Observability/faro         |
-| faro-web-sdk | ~/src/Observability/faro-web-sdk |
+| Service      | Path                                     |
+|--------------|------------------------------------------|
+| grafana      | ~/src/Observability/grafana/grafana      |
+| mimir        | ~/src/Observability/grafana/mimir        |
+| loki         | ~/src/Observability/grafana/loki         |
+| tempo        | ~/src/Observability/grafana/tempo        |
+| alloy        | ~/src/Observability/grafana/alloy        |
+| faro         | ~/src/Observability/grafana/faro         |
+| faro-web-sdk | ~/src/Observability/grafana/faro-web-sdk |
 
 ## 搜索規則
 
