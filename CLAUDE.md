@@ -2,6 +2,59 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Research Agents 使用指引
+
+當遇到以下類型的問題時，**必須優先使用對應的 Agent 從源碼中查找**，經過分析後再給出答覆：
+
+### 可用 Agents
+
+| Agent | 用途 | 涵蓋的源碼倉庫 |
+|-------|------|---------------|
+| `ob-grafana-stack` | Grafana 生態系問題 | Grafana, Tempo, Loki, Mimir, Alloy, Faro |
+| `ob-opentelemetry` | OpenTelemetry 標準與實作 | opentelemetry-js, opentelemetry-specification, semantic-conventions |
+
+### 版本對齊機制（重要）
+
+**Agent 查找前必須確保源碼版本與專案一致。** 版本來源如下：
+
+#### Daemon Services 版本
+從 `lgtm/docker-compose.yaml` 的 image tag 取得：
+```bash
+grep -E "image: grafana/" lgtm/docker-compose.yaml
+```
+
+#### SDK 版本
+從 `package.json` 或 `package-lock.json` 取得：
+- **Backend OTel SDK**: `backend/package.json` → `@opentelemetry/*`
+- **Frontend Faro SDK**: `frontend/package.json` → `@grafana/faro-*`
+
+#### 版本查找順序
+1. 先讀取 `package-lock.json`（精確版本）
+2. 若無，讀取 `package.json`（範圍版本，取 major.minor）
+
+### 何時使用
+
+**使用 `ob-grafana-stack`：**
+- Grafana dashboard、datasource 配置問題
+- Tempo traces 查詢、Service Graph、metrics generator
+- Loki logs 查詢、label 配置
+- Alloy pipeline、receiver、exporter 配置
+- Faro SDK 前端監控問題
+
+**使用 `ob-opentelemetry`：**
+- OTel SDK API 使用方式（TracerProvider, LoggerProvider 等）
+- Instrumentation 配置（自動/手動）
+- Semantic conventions（attribute 命名規範）
+- OTLP 協議細節
+
+### 使用原則
+
+1. **先確認版本，再查源碼** — Agent 必須先從專案文件確認版本，git checkout 後再搜索
+2. **先查源碼，後給建議** — 不要憑記憶回答，優先從源碼找到確切實作
+3. **跨組件問題用 `ob-grafana-stack`** — 如 Service Graph 涉及 Tempo + Grafana，在同一個 agent 中處理
+4. **OTel 標準問題用 `ob-opentelemetry`** — 如 attribute 命名、SDK 用法
+5. **兩者都相關時** — 可依序呼叫兩個 agents，綜合分析
+
 ## Project Overview
 
 這是一個 OpenTelemetry 觀測性 POC 專案，展示如何將 logs 和 traces 整合到 Node.js 應用程式中，並透過 LGTM (Loki, Grafana, Tempo, Alloy) stack 進行視覺化分析。
