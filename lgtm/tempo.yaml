@@ -49,6 +49,14 @@ storage:
       path: /var/tempo/blocks
     wal:
       path: /var/tempo/wal
+# ## Store traces to S3
+# storage:
+#   trace:
+#     backend: s3
+#     s3:
+#       bucket: tempo-traces
+#       region: us-west-2
+#       role_arn: arn:aws:iam::123456789012:role/tempo-s3
 
 # https://grafana.com/docs/tempo/latest/configuration/#metrics-generator
 metrics_generator:
@@ -76,7 +84,7 @@ metrics_generator:
     local_blocks:
       # TraceQL metrics processor for Grafana Traces Drilldown
       # Generates metrics from trace data for query performance
-      flush_to_storage: true
+      complete_block_timeout: 5m
       max_block_duration: 5m
       max_block_bytes: 10485760  # 10MB
       filter_server_spans: false

@@ -9,7 +9,7 @@ x-logging: &default-logging
 services:
 
   loki:
-    image: grafana/loki:3.6.2
+    image: grafana/loki:3.6.3
     container_name: loki
     hostname: loki
     restart: always
@@ -40,7 +40,7 @@ services:
       # - "9096:9095"  # Tempo gRPC
     volumes:
       - "./tempo.yaml:/etc/tempo/tempo-config.yaml"
-      # - "./mnt_tempo:/var/tempo"
+      - "./mnt_tempo:/var/tempo"
     command:
       [
         "-config.file=/etc/tempo/tempo-config.yaml",
@@ -69,7 +69,7 @@ services:
     logging: *default-logging
 
   alloy:
-    image: grafana/alloy:v1.12.1
+    image: grafana/alloy:v1.12.2
     container_name: alloy
     hostname: alloy
     restart: always

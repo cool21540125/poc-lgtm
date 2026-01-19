@@ -6,7 +6,7 @@ const { trace, SpanStatusCode } = require('@opentelemetry/api');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
 const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
-// const { SequelizeInstrumentation } = require('@opentelemetry/instrumentation-sequelize');
+const { SequelizeInstrumentation } = require('@opentelemetry/instrumentation-sequelize');
 
 // ===== OpenTelemetry Logging Setup =====
 const { LoggerProvider, SimpleLogRecordProcessor } = require('@opentelemetry/sdk-logs');
@@ -46,13 +46,13 @@ registerInstrumentations({
       },
     }),
     new ExpressInstrumentation(),
-    // Sequelize instrumentation 已移除，避免產生內部 SQL 查詢的 traces
-    // new SequelizeInstrumentation({
-    //   // 啟用 SQL 語句記錄（會顯示完整的 SQL 查詢）
-    //   // responseHook: (span, response) => {
-    //   //   // 可以在這裡添加自定義屬性
-    //   // }
-    // }),
+    // // Sequelize instrumentation 已移除，避免產生內部 SQL 查詢的 traces
+    new SequelizeInstrumentation({
+      // 啟用 SQL 語句記錄（會顯示完整的 SQL 查詢）
+      // responseHook: (span, response) => {
+      //   // 可以在這裡添加自定義屬性
+      // }
+    }),
   ],
 });
 
@@ -368,11 +368,11 @@ app.get('/users', async (req, res) => {
   try {
     const userList = await userService.getAllUsers();
 
-    log.info('查詢用戶列表', {
-      'operation': 'list_users',
-      'users.count': userList.length,
-      'request.id': req.requestId,
-    });
+    // log.info('查詢用戶列表', {
+    //   'operation': 'list_users',
+    //   'users.count': userList.length,
+    //   'request.id': req.requestId,
+    // });
 
     res.status(200).json({
       count: userList.length,

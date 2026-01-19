@@ -21,7 +21,7 @@ export const faro = initializeFaro({
 
     new TracingInstrumentation({
       instrumentationOptions: {
-        propagateTraceHeaderCorsUrls: [
+        propagateTraceHeaderCorsUrls: [  // 讓 Faro 自動在 HTTP 加入 traceparent header
           /http:\/\/localhost:3000.*/,
         ],
       },
@@ -41,8 +41,8 @@ export const faro = initializeFaro({
 
       // 檢查是否為 OPTIONS 請求
       if (payload.http?.method === 'OPTIONS' ||
-          payload.event_data_http?.method === 'OPTIONS' ||
-          (typeof payload === 'string' && payload.includes('OPTIONS'))) {
+        payload.event_data_http?.method === 'OPTIONS' ||
+        (typeof payload === 'string' && payload.includes('OPTIONS'))) {
         return null; // 返回 null 表示丟棄此項
       }
     }
